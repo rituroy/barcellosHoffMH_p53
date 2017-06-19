@@ -38,6 +38,9 @@ tolowerWords=function(s, strict=FALSE) {
 ##############################################
 ## Section 1
 
+verbose=T
+verbose=F
+
 dataset <- "p53"
 dataset <- "tmp"
 
@@ -56,7 +59,7 @@ if (computerFlag=="cluster") {
         fName="coral_1CR_1FR.count"
         tbl2=read.table(paste(datadir,fName,sep=""),sep="\t",h=F,quote="",comment.char="",as.is=T,fill=T,nrow=5)
     }
-
+    
     counts <- HTSeqCountDataSet$byName(dataset, tags = "tophat2,gtf", organism = organism)
     counts <- setFullNamesTranslator(counts, function(name, ...) chartr(";", "/", name))
     counts
@@ -121,7 +124,20 @@ if (computerFlag=="cluster") {
     j=match(phen$id,phen2$id); j1=which(!is.na(j)); j2=j[j1]
     #phen=phen[match(colnames(counts),phen$id),]
     phen=cbind(phen[match(colnames(counts),phen$id),],phen2[j2,which(!names(phen2)%in%names(phen))])
-    rm(phen2)
+    phen2=read.table(paste(datadir,"Suervised cluster RNAseq and Microarray data - rnaSeq.txt",sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T,skip=1)
+    names(phen2)[match(c("Sample.ID","Fast.Slopes","X","Sample.ID.1","Slow.Slopes"),names(phen2))]=c("id","slope","X","id2","slope2")
+    phen3=phen2
+    phen3$id=phen3$id2
+    phen3$slope=phen3$slope2
+    phen3$slopeCat="slow"
+    phen2$slopeCat="fast"
+    phen2=rbind(phen2,phen3)
+    phen2$id=gsub(" ","",phen2$id)
+    j=match(phen$sampleId,phen2$id); j1=which(!is.na(j)); j2=j[j1]
+    phen$slope=NA
+    phen$slopeCat=""
+    phen[j1,c("slope","slopeCat")]=phen2[j2,c("slope","slopeCat")]
+    rm(phen2,phen3)
     dge=DGEList(counts=counts,samples=phen,group=NULL,genes=NULL)
     samples=dge$samples
 }
@@ -140,9 +156,10 @@ round(rho[j,j],2)
 dge$samples[1:3, -1]
 samples=cbind(samples,dge$samples[,c("lib.size","norm.factors")])
 rownames(samples)=NULL
-write.table(cbind(geneId=rownames(dge$counts),dge$counts), file=paste("count_raw_",organism,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
-write.table(samples, file=paste("sample_",organism,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
-
+if (verbose) {
+    write.table(cbind(geneId=rownames(dge$counts),dge$counts), file=paste("count_raw_",organism,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
+    write.table(samples, file=paste("sample_",organism,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
+}
 
 dge$samples$group <- samples$experimentNo
 
@@ -254,11 +271,12 @@ ann$length=sapply(ann$chromosome,function(x) {
 },USE.NAMES=F)
 i=match(rownames(dge$counts),sub("*","",ann$gene_id,fixed=T))
 x=rpkm(dge, gene.length=ann$length[i], normalized.lib.sizes=TRUE, log=FALSE, prior.count=0.25)
-write.table(cbind(geneId=rownames(dge$counts),x), file=paste("rpkm",fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
-
-#	save(dge,file=paste("dge",fName1,".RData",sep=""))
-write.table(cbind(geneId=rownames(dge$counts),dge$counts), file=paste("count",fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
-write.table(samples, file=paste("sample",fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
+if (verbose) {
+    write.table(cbind(geneId=rownames(dge$counts),x), file=paste("rpkm",fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
+    #save(dge,file=paste("dge",fName1,".RData",sep=""))
+    write.table(cbind(geneId=rownames(dge$counts),dge$counts), file=paste("count",fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
+    write.table(samples, file=paste("sample",fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
+}
 
 if (F) {
     png("densityPlot_normCount.png",width=3*240, height=3*240)
@@ -307,292 +325,363 @@ grpName=grpUniq
 
 library(limma)
 library(edgeR)
-
+library(sva)
 
 fName2="_rnaSeq_p53"
 
 
-compList=paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe"),"VsSham",sep=""); subsetFlag=""
-compList="_A1026VsA1014"; subsetFlag=""
-compList="_gammaVsSham"; subsetFlag="_A1014A1402"
+compList=paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe"),"VsSham",sep=""); subsetList=""
+compList="_A1026VsA1014"; subsetList=""
+compList="_gammaVsSham"; subsetList="_A1014A1402"
 
-for (compFlag in compList) {
-    switch(compFlag,
-    "_A1026VsA1014"={
-        varList="experimentNo"; grpUniq=c("A1014","A1026"); grpName=grpUniq
-    },
-    "_capeVsSham"={
-        varList="treatment2"; grpUniq=c("Sham","CAPE"); grpName=c("sham","cape")
-    },
-    "_capeGammaVsSham"={
-        varList="treatment2"; grpUniq=c("Sham","CAPE+ gamma-rays"); grpName=c("sham","capeGamma")
-    },
-    "_gammaVsSham"={
-        varList="treatment2"; grpUniq=c("Sham","gamma-rays"); grpName=c("sham","gamma")
-    },
-    "_gammaTeVsSham"={
-        varList="treatment2"; grpUniq=c("Sham","gamma-rays-TE"); grpName=c("sham","gammaTe")
-    },
-    "_hzeVsSham"={
-        varList="treatment2"; grpUniq=c("Sham","HZE"); grpName=c("sham","hze")
-    },
-    "_hzeTeVsSham"={
-        varList="treatment2"; grpUniq=c("Sham","HZE-TE"); grpName=c("sham","hzeTe")
-    }
-    )
+compList="_slope"
+subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe"),sep=""))
 
-    #subsetFlag=""; varList="experimentNo"; grpUniq=c("A1014","A1026"); grpName=grpUniq
-    #subsetFlag="_A1014A1402"; varList="treatment2"; grpUniq=c("Sham","gamma-rays"); grpName=c("sham","gamma")
-
-
-    maxCntVec=maxCntVecCpm
-    samId=1:nrow(dgeT$samples)
-    switch(subsetFlag,
-    "_A1014A1402"={
-        samId=which(dgeT$samples$experimentNo%in%c("A1014","A1402"))
-    }
-    )
-    samId=samId[which(dgeT$samples[samId,varList]%in%grpUniq)]
-
-    dgeF=dgeT[i,samId]
-    varList2="experimentNo"
-    x=table(dgeF$samples[,varList],dgeF$samples[,varList2])
-    y=x!=0
-    if (nrow(x)>1 & ncol(x)>1 & any(y[1,]==y[2,])) {
-        covFlag="_exptNoAdj"
-    } else {
-        varList2="investigator"
-        x=table(dgeF$samples[,varList],dgeF$samples[,varList2])
-        y=x!=0
-        if (nrow(x)>1 & ncol(x)>1 & any(y[1,]==y[2,])) {
-            covFlag="_investAdj"
-        } else {
-            covFlag=""
-            varList2=NULL
+for (subsetFlag in subsetList) {
+    for (compFlag in compList) {
+        varType="categorical"
+        switch(compFlag,
+        "_A1026VsA1014"={
+            varList="experimentNo"; grpUniq=c("A1014","A1026"); grpName=grpUniq
+        },
+        "_capeVsSham"={
+            varList="treatment2"; grpUniq=c("Sham","CAPE"); grpName=c("sham","cape")
+        },
+        "_capeGammaVsSham"={
+            varList="treatment2"; grpUniq=c("Sham","CAPE+ gamma-rays"); grpName=c("sham","capeGamma")
+        },
+        "_gammaVsSham"={
+            varList="treatment2"; grpUniq=c("Sham","gamma-rays"); grpName=c("sham","gamma")
+        },
+        "_gammaTeVsSham"={
+            varList="treatment2"; grpUniq=c("Sham","gamma-rays-TE"); grpName=c("sham","gammaTe")
+        },
+        "_hzeVsSham"={
+            varList="treatment2"; grpUniq=c("Sham","HZE"); grpName=c("sham","hze")
+        },
+        "_hzeTeVsSham"={
+            varList="treatment2"; grpUniq=c("Sham","HZE-TE"); grpName=c("sham","hzeTe")
+        },
+        "_slope"={
+            varType="continuous"
+            varList="slope"; grpUniq=grpName=NULL
         }
-    }
+        )
 
-    for (minCnt in c(0,1,2,5,10,20,50)) {
-    #for (minCnt in c(50)) {
-        i=which(maxCntVec>=minCnt)
-        #dgeF=list(counts=dgeT$counts[i,],genes=dgeT$genes[i,],samples=dgeT$samples)
+        #subsetFlag=""; varList="experimentNo"; grpUniq=c("A1014","A1026"); grpName=grpUniq
+        #subsetFlag="_A1014A1402"; varList="treatment2"; grpUniq=c("Sham","gamma-rays"); grpName=c("sham","gamma")
+
+
+        maxCntVec=maxCntVecCpm
+        samId=1:nrow(dgeT$samples)
+        switch(subsetFlag,
+        "_A1014A1402"={
+            samId=which(dgeT$samples$experimentNo%in%c("A1014","A1402"))
+        },
+        "_cape"={
+            samId=which(dgeT$samples$treatment2%in%c("CAPE"))
+        },
+        "_capeGamma"={
+            samId=which(dgeT$samples$treatment2%in%c("CAPE+ gamma-rays"))
+        },
+        "_gamma"={
+            samId=which(dgeT$samples$treatment2%in%c("gamma-rays"))
+        },
+        "_gammaTe"={
+            samId=which(dgeT$samples$treatment2%in%c("gamma-rays-TE"))
+        },
+        "_hze"={
+            samId=which(dgeT$samples$treatment2%in%c("HZE"))
+        },
+        "_hzeTe"={
+            samId=which(dgeT$samples$treatment2%in%c("HZE-TE"))
+        },
+        "_sham"={
+            samId=which(dgeT$samples$treatment2%in%c("Sham"))
+        }
+        )
+        if (is.null(grpUniq)) {
+            samId=samId[!is.na(dgeT$samples[samId,varList])]
+        } else {
+            samId=samId[which(dgeT$samples[samId,varList]%in%grpUniq)]
+        }
+
+        i=1:nrow(dgeT$counts)
         dgeF=dgeT[i,samId]
-        #dgeF$samples$group=as.factor(as.character(dgeF$samples[,varList]))
-        fName3=paste("_",grpName[2],"Vs",capWords(grpName[1]),covFlag,subsetFlag,fName2,"_voom_minCnt",minCnt,sep="")
-        if (covFlag=="") {
-            modelThis=as.formula(paste("~as.factor(",varList,")",sep=""))
+        if (varList=="slope") {
+            varList2="treatment2"
+            x=table(dgeF$samples[,varList2])
+            if (length(x)>1) {
+                covFlag="_treatAdj"
+            } else {
+                varList2="experimentNo"
+                x=table(dgeF$samples[,varList2])
+                if (length(x)>1) {
+                    covFlag="_exptNoAdj"
+                } else {
+                    covFlag=""
+                    varList2=NULL
+                }
+            }
         } else {
-            modelThis=as.formula(paste("~as.factor(",varList,")+as.factor(",varList2,")",sep=""))
+            varList2="experimentNo"
+            x=table(dgeF$samples[,varList],dgeF$samples[,varList2])
+            y=x!=0
+            if (nrow(x)>1 & ncol(x)>1 & any(y[1,]==y[2,])) {
+                covFlag="_exptNoAdj"
+            } else {
+                varList2="investigator"
+                x=table(dgeF$samples[,varList],dgeF$samples[,varList2])
+                y=x!=0
+                if (nrow(x)>1 & ncol(x)>1 & any(y[1,]==y[2,])) {
+                    covFlag="_investAdj"
+                } else {
+                    covFlag=""
+                    varList2=NULL
+                }
+            }
         }
-        design=model.matrix(modelThis,data=dgeF$samples)
-        #design=model.matrix(~group,data=dgeF$samples)
-        if (F) {
-            #fit <- voom(dgeF$counts,design,plot=TRUE)
-            #fit <- voom(dgeF$counts,design,save.plot=TRUE)
-            png("tmp.png")
-            plot(fit)
-            dev.off()
+        
+        #for (minCnt in c(0,1,2,5,10,20,50)) {
+        #for (minCnt in c(50)) {
+        for (minCnt in c(1)) {
+            fName3=paste("_",ifelse(is.null(grpUniq),varList,paste(grpName[2],"Vs",capWords(grpName[1]),sep="")),covFlag,subsetFlag,fName2,"_voom_minCnt",minCnt,sep="")
+            i=which(maxCntVec>=minCnt)
+            #dgeF=list(counts=dgeT$counts[i,],genes=dgeT$genes[i,],samples=dgeT$samples)
+            dgeF=dgeT[i,samId]
+            #dgeF$samples$group=as.factor(as.character(dgeF$samples[,varList]))
+            if (covFlag=="") {
+                modelThis=paste("~",varList,sep="")
+            } else {
+                modelThis=paste("~",varList,"+as.factor(",varList2,")",sep="")
+            }
+            if (varType=="categorical") {
+                modelThis=sub("varList","as.factor(varList)",modelThis)
+            }
+            modelThis=as.formula(modelThis)
+            design=model.matrix(modelThis,data=dgeF$samples)
+            #design=model.matrix(~group,data=dgeF$samples)
+            if (F) {
+                #fit <- voom(dgeF$counts,design,plot=TRUE)
+                #fit <- voom(dgeF$counts,design,save.plot=TRUE)
+                png("tmp.png")
+                plot(fit)
+                dev.off()
+            }
+            #dat <- voom(dgeF$counts,design,save.plot=F)
+            dat <- voom(dgeF,design,save.plot=F)
+            #save(dat,design,file=paste("voom",fName3,".RData",sep=""))
+            fit <- lmFit(dat,design)
+            rm(dat)
+            fit <- eBayes(fit)
+            #topTable(fit,coef=ncol(design))
+            colId=2
+            top=cbind(geneId=rownames(fit$coef),logFC=fit$coef[,colId],PValue=fit$p.value[,colId])
+            write.table(top,paste("stat",fName3,".txt",sep=""), sep="\t", col.names=T, row.names=F, quote=F)
         }
-        #dat <- voom(dgeF$counts,design,save.plot=F)
-        dat <- voom(dgeF,design,save.plot=F)
-        #save(dat,design,file=paste("voom",fName3,".RData",sep=""))
-        fit <- lmFit(dat,design)
-        rm(dat)
-        fit <- eBayes(fit)
-        #topTable(fit,coef=ncol(design))
-        colId=2
-        top=cbind(geneId=rownames(fit$coef),logFC=fit$coef[,colId],PValue=fit$p.value[,colId])
-        write.table(top,paste("stat",fName3,".txt",sep=""), sep="\t", col.names=T, row.names=F, quote=F)
+
+        ## -----------------------------------------
+        ## Wilcox test
+
+        if (varType=="categorical") {
+            i=1:nrow(dgeT)
+            dgeF=dgeT[i,samId]
+            dat=lcpmT[i,samId]
+            if (varType=="categorical") {
+                dgeF$samples$group=as.factor(as.character(dgeF$samples[,varList]))
+            } else {
+                dgeF$samples$group=dgeF$samples[,varList]
+            }
+            grp=dgeF$samples$group
+            fName3=paste("_",ifelse(is.null(grpUniq),varList,paste(grpName[2],"Vs",capWords(grpName[1]),sep="")),subsetFlag,fName2,"_wilcox",sep="")
+
+            #save(dat,grp,fName3,file="tmp.RData")
+
+            library(coin)
+            #load("tmp.RData")
+            distrib="exact"
+            timeStamp=Sys.time()
+            print(format(timeStamp, "%x %X"))
+            tmp=rep(NA,nrow(dat))
+            top=data.frame(geneId=rownames(dat),logFC=tmp,PValue=rep(NA,nrow(dat)),stringsAsFactors=F)
+            i1=1:100
+            i1=1:nrow(dat)
+            print(nrow(dat))
+            for (i in i1) {
+                if (i%%1000==0) print(i)
+                res=wilcox_test(dat[i,]~grp,distribution=distrib)
+                top$PValue[i]=pvalue(res)
+            }
+            timeStamp=c(timeStamp,Sys.time())
+            print(format(timeStamp[2], "%x %X"))
+            print(diff(timeStamp))
+            write.table(top,paste("stat",fName3,".txt",sep=""), sep="\t", col.names=T, row.names=F, quote=F)
+        }
+
+        ## -----------------------------------------
+        ## SVA based
+
+        if (!is.null(varList2)) {
+            minCnt=1
+            minCnt=50
+            minCnt=500
+            maxCntVec=maxCntVecRaw
+
+            minCnt=10
+            minCnt=1
+            maxCntVec=maxCntVecCpm
+
+            i=which(maxCntVec>=minCnt/10^6)
+            i=which(maxCntVec>=minCnt)
+
+            dgeF=dgeT[i,samId]
+            #dgeF$samples$group=as.factor(as.character(dgeF$samples$treatment2))
+            if (varType=="categorical") {
+                dgeF$samples$group=as.factor(as.character(dgeF$samples[,varList]))
+            } else {
+                dgeF$samples$group=dgeF$samples[,varList]
+            }
+            fName3=paste("_",ifelse(is.null(grpUniq),varList,paste(grpName[2],"Vs",capWords(grpName[1]),sep="")),covFlag,subsetFlag,fName2,"_voom_sva_minCnt",minCnt,sep="")
+            if (covFlag=="") {
+                modelThis=paste("~",varList,sep="")
+            } else {
+                modelThis=paste("~",varList,"+as.factor(",varList2,")",sep="")
+            }
+            if (varType=="categorical") {
+                modelThis=sub("varList","as.factor(varList)",modelThis)
+            }
+            modelThis=as.formula(modelThis)
+            mod = model.matrix(modelThis, data=dgeF$samples)
+            if (covFlag=="") {
+                modelThis=as.formula(paste("~1",sep=""))
+            } else {
+                modelThis=as.formula(paste("~as.factor(",varList2,")",sep=""))
+            }
+            #modelThis=as.formula(paste("~as.factor(",varList2,")",sep=""))
+            mod0 = model.matrix(modelThis, data=dgeF$samples)
+            #mod0 = model.matrix(~as.factor(experimentNo), data=dgeF$samples)
+            svObj=sva(lcpmT[i,samId],mod,mod0)
+            #svObj = svaseq(10^6*cpmT[i,samId],mod,mod0)
+            dat=svObj$sv; colnames(dat)=paste("sv",1:ncol(dat),sep="")
+            design = cbind(mod,dat)
+            #design=model.matrix(~group,data=dgeF$samples)
+            dat <- voom(dgeF,design,save.plot=F)
+            #save(dat,design,file=paste("voom",fName3,".RData",sep=""))
+            fit <- eBayes(lmFit(dat,design))
+            fit0=fit
+            rm(dat)
+            colId=2
+            top=cbind(geneId=rownames(fit$coef),logFC=fit$coef[,colId],PValue=fit$p.value[,colId])
+            write.table(top,paste("stat",fName3,".txt",sep=""), sep="\t", col.names=T, row.names=F, quote=F)
+
+
+            if (compFlag=="_gammaVsSham" & subsetFlag=="_A1014A1402") {
+                j=which(dgeT$samples$treatment2%in%c("gamma-rays","Sham") & dgeT$samples$experimentNo%in%c("A1014"))
+                dgeF=dgeT[i,j]
+                dgeF$samples$group=as.factor(as.character(dgeF$samples$treatment2))
+                fName3=paste("_gammaVsSham_A1014",fName2,"_voom_minCnt",minCnt,sep="")
+                #design = model.matrix(~as.factor(treatment2), data=dgeF$samples)
+                mod = model.matrix(~as.factor(treatment2), data=dgeF$samples)
+                mod0 = model.matrix(~1, data=dgeF$samples)
+                svObj=sva(lcpmT[i,j],mod,mod0)
+                #svObj = svaseq(10^6*cpmT[i,j],mod,mod0)
+                dat=svObj$sv; colnames(dat)=paste("sv",1:ncol(dat),sep="")
+                design = cbind(mod,dat)
+                dat <- voom(dgeF,design,save.plot=F)
+                #save(dat,design,file=paste("voom",fName3,".RData",sep=""))
+                fit <- eBayes(lmFit(dat,design))
+                fit1=fit
+                rm(dat)
+                colId=2
+                top=cbind(geneId=rownames(fit$coef),logFC=fit$coef[,colId],PValue=fit$p.value[,colId])
+                write.table(top,paste("stat",fName3,".txt",sep=""), sep="\t", col.names=T, row.names=F, quote=F)
+
+
+                i=which(maxCntVec>=minCnt)
+                j=which(dgeT$samples$treatment2%in%c("gamma-rays","Sham") & dgeT$samples$experimentNo%in%c("A1402"))
+                dgeF=dgeT[i,j]
+                dgeF$samples$group=as.factor(as.character(dgeF$samples$treatment2))
+                fName3=paste("_gammaVsSham_A1402",fName2,"_voom_minCnt",minCnt,sep="")
+                #design = model.matrix(~as.factor(treatment2), data=dgeF$samples)
+                mod = model.matrix(~as.factor(treatment2), data=dgeF$samples)
+                mod0 = model.matrix(~1, data=dgeF$samples)
+                svObj=sva(lcpmT[i,j],mod,mod0)
+                #svObj = svaseq(10^6*cpmT[i,j],mod,mod0)
+                dat=svObj$sv; colnames(dat)=paste("sv",1:ncol(dat),sep="")
+                design = cbind(mod,dat)
+                dat <- voom(dgeF,design,save.plot=F)
+                #save(dat,design,file=paste("voom",fName3,".RData",sep=""))
+                fit <- eBayes(lmFit(dat,design))
+                fit2=fit
+                rm(dat)
+                colId=2
+                top=cbind(geneId=rownames(fit$coef),logFC=fit$coef[,colId],PValue=fit$p.value[,colId])
+                write.table(top,paste("stat",fName3,".txt",sep=""), sep="\t", col.names=T, row.names=F, quote=F)
+
+                fName3=paste("_",ifelse(is.null(grpUniq),varList,paste(grpName[2],"Vs",capWords(grpName[1]),sep="")),subsetFlag,fName2,sep="")
+
+                colId=2
+                png(paste("coef",fName3,".png",sep=""))
+                par(mfrow=c(2,2))
+                lim=range(c(fit0$coef[,colId],fit1$coef[,colId],fit2$coef[,colId]),na.rm=T)
+                x1=fit1$coef[,colId]; x2=fit2$coef[,colId]
+                plot(x1,x2,xlim=lim,ylim=lim,main=paste("Gamma vs. sham\nPearson corr ",round(cor(x1,x2,use="complete.obs",method="pearson"),2),sep=""),xlab="A1014: Coef",ylab="A1402: Coef")
+                abline(c(0,1))
+                x1=fit0$coef[,colId]; x2=fit1$coef[,colId]
+                plot(x1,x2,xlim=lim,ylim=lim,main=paste("Gamma vs. sham\nPearson corr ",round(cor(x1,x2,use="complete.obs",method="pearson"),2),sep=""),xlab="A1402A1014 SV: Coef",ylab="A1014: Coef")
+                abline(c(0,1))
+                x1=fit0$coef[,colId]; x2=fit2$coef[,colId]
+                plot(x1,x2,main=paste("Gamma vs. sham\nPearson corr ",round(cor(x1,x2,use="complete.obs",method="pearson"),2),sep=""),xlab="A1014A1402 SV: Coef",ylab="A1402: Coef")
+                abline(c(0,1))
+                dev.off()
+
+
+                colId=2
+                png(paste("pv",fName3,".png",sep=""))
+                par(mfrow=c(2,2))
+                lim=range(c(fit0$p.value[,colId],fit1$p.value[,colId],fit2$p.value[,colId]),na.rm=T)
+                plot(fit1$p.value[,colId],fit2$p.value[,colId],xlim=lim,ylim=lim,main="Gamma vs. sham",xlab="A1014: Coef",ylab="A1402: Coef")
+                abline(c(0,1))
+                plot(fit0$p.value[,colId],fit2$p.value[,colId],xlim=lim,ylim=lim,main="Gamma vs. sham",xlab="A1402A1014 SV: Coef",ylab="A1014: Coef")
+                abline(c(0,1))
+                plot(fit0$p.value[,colId],fit1$p.value[,colId],main="Gamma vs. sham",xlab="A1014A1402 SV: Coef",ylab="A1402: Coef")
+                abline(c(0,1))
+                dev.off()
+
+                colId=2
+                png(paste("histogram_pv",fName3,".png",sep=""))
+                par(mfrow=c(2,2))
+                lim=range(c(fit0$p.value[,colId],fit1$p.value[,colId],fit2$p.value[,colId]),na.rm=T)
+                hist(fit0$p.value[,colId],main="A1402A1014 SV: Gamma vs. sham",xlab="P-value")
+                hist(fit1$p.value[,colId],main="A1014: Gamma vs. sham",xlab="P-value")
+                hist(fit2$p.value[,colId],main="A1402:Gamma vs. sham",xlab="P-value")
+                dev.off()
+
+
+                colId=2
+                png(paste("pv",fName3,".png",sep=""))
+                par(mfrow=c(2,2))
+                lim=c(-3,3)
+                plot(alcpmT[i1],log10(stat_1$pv)-log10(statW$pv[i1]),ylim=lim,main=paste(subsetName,compName,"\nN = ",nrow(stat_1),sep=""),xlab="Avg logCPM",ylab="log10(PV-limma)-log10(PV-wilcox)",cex=.2,pch=20,cex.main=2.5,cex.axis=2,cex.lab=1.5)
+                abline(h=0,col="red")
+                lim=range(c(fit0$p.value[,colId],fit1$p.value[,colId],fit2$p.value[,colId]),na.rm=T)
+                plot(fit1$p.value[,colId],fit2$p.value[,colId],xlim=lim,ylim=lim,main="Gamma vs. sham",xlab="A1014: Coef",ylab="A1402: Coef")
+                abline(c(0,1))
+                plot(fit0$p.value[,colId],fit2$p.value[,colId],xlim=lim,ylim=lim,main="Gamma vs. sham",xlab="A1402A1014 SV: Coef",ylab="A1014: Coef")
+                abline(c(0,1))
+                plot(fit0$p.value[,colId],fit1$p.value[,colId],main="Gamma vs. sham",xlab="A1014A1402 SV: Coef",ylab="A1402: Coef")
+                abline(c(0,1))
+                dev.off()
+
+
+                pThres=0.05
+                table(fit1$p.value[,colId]<pThres,fit2$p.value[,colId]<pThres)
+                table(fit0$p.value[,colId]<pThres,fit1$p.value[,colId]<pThres)
+                table(fit0$p.value[,colId]<pThres,fit2$p.value[,colId]<pThres)
+            }
+        }
     }
-
-    ## -----------------------------------------
-    ## Wilcox test
-
-if (T) {
-    i=1:nrow(dgeT)
-    dgeF=dgeT[i,samId]
-    dat=lcpmT[i,samId]
-    dgeF$samples$group=as.factor(as.character(dgeF$samples[,varList]))
-    grp=dgeF$samples$group
-    fName3=paste("_",grpName[2],"Vs",capWords(grpName[1]),subsetFlag,fName2,"_wilcox",sep="")
-
-    #save(dat,grp,fName3,file="tmp.RData")
-
-    library(coin)
-    #load("tmp.RData")
-    distrib="exact"
-    timeStamp=Sys.time()
-    print(format(timeStamp, "%x %X"))
-    tmp=rep(NA,nrow(dat))
-    top=data.frame(geneId=rownames(dat),logFC=tmp,PValue=rep(NA,nrow(dat)),stringsAsFactors=F)
-    i1=1:100
-    i1=1:nrow(dat)
-    print(nrow(dat))
-    for (i in i1) {
-        if (i%%1000==0) print(i)
-        res=wilcox_test(dat[i,]~grp,distribution=distrib)
-        top$PValue[i]=pvalue(res)
-    }
-    timeStamp=c(timeStamp,Sys.time())
-    print(format(timeStamp[2], "%x %X"))
-    print(diff(timeStamp))
-    write.table(top,paste("stat",fName3,".txt",sep=""), sep="\t", col.names=T, row.names=F, quote=F)
 }
 
-    ## -----------------------------------------
-
-    library(sva)
-
-    minCnt=1
-    minCnt=50
-    minCnt=500
-    maxCntVec=maxCntVecRaw
-
-    minCnt=10
-    minCnt=1
-    maxCntVec=maxCntVecCpm
-
-    i=which(maxCntVec>=minCnt/10^6)
-    i=which(maxCntVec>=minCnt)
-
-    dgeF=dgeT[i,samId]
-    #dgeF$samples$group=as.factor(as.character(dgeF$samples$treatment2))
-    dgeF$samples$group=as.factor(as.character(dgeF$samples[,varList]))
-    fName3=paste("_",grpName[2],"Vs",capWords(grpName[1]),covFlag,subsetFlag,fName2,"_voom_sva_minCnt",minCnt,sep="")
-    if (covFlag=="") {
-        modelThis=as.formula(paste("~as.factor(",varList,")",sep=""))
-    } else {
-        modelThis=as.formula(paste("~as.factor(",varList,")+as.factor(",varList2,")",sep=""))
-    }
-    mod = model.matrix(modelThis, data=dgeF$samples)
-    if (covFlag=="") {
-        modelThis=as.formula(paste("~1",sep=""))
-    } else {
-        modelThis=as.formula(paste("~as.factor(",varList2,")",sep=""))
-    }
-    #modelThis=as.formula(paste("~as.factor(",varList2,")",sep=""))
-    mod0 = model.matrix(modelThis, data=dgeF$samples)
-    #mod0 = model.matrix(~as.factor(experimentNo), data=dgeF$samples)
-    svObj=sva(lcpmT[i,samId],mod,mod0)
-    #svObj = svaseq(10^6*cpmT[i,samId],mod,mod0)
-    dat=svObj$sv; colnames(dat)=paste("sv",1:ncol(dat),sep="")
-    design = cbind(mod,dat)
-    #design=model.matrix(~group,data=dgeF$samples)
-    dat <- voom(dgeF,design,save.plot=F)
-    #save(dat,design,file=paste("voom",fName3,".RData",sep=""))
-    fit <- eBayes(lmFit(dat,design))
-    fit0=fit
-    rm(dat)
-    colId=2
-    top=cbind(geneId=rownames(fit$coef),logFC=fit$coef[,colId],PValue=fit$p.value[,colId])
-    write.table(top,paste("stat",fName3,".txt",sep=""), sep="\t", col.names=T, row.names=F, quote=F)
-
-
-    if (compFlag=="_gammaVsSham" & subsetFlag=="_A1014A1402") {
-        j=which(dgeT$samples$treatment2%in%c("gamma-rays","Sham") & dgeT$samples$experimentNo%in%c("A1014"))
-        dgeF=dgeT[i,j]
-        dgeF$samples$group=as.factor(as.character(dgeF$samples$treatment2))
-        fName3=paste("_gammaVsSham_A1014",fName2,"_voom_minCnt",minCnt,sep="")
-        #design = model.matrix(~as.factor(treatment2), data=dgeF$samples)
-        mod = model.matrix(~as.factor(treatment2), data=dgeF$samples)
-        mod0 = model.matrix(~1, data=dgeF$samples)
-        svObj=sva(lcpmT[i,j],mod,mod0)
-        #svObj = svaseq(10^6*cpmT[i,j],mod,mod0)
-        dat=svObj$sv; colnames(dat)=paste("sv",1:ncol(dat),sep="")
-        design = cbind(mod,dat)
-        dat <- voom(dgeF,design,save.plot=F)
-        #save(dat,design,file=paste("voom",fName3,".RData",sep=""))
-        fit <- eBayes(lmFit(dat,design))
-        fit1=fit
-        rm(dat)
-        colId=2
-        top=cbind(geneId=rownames(fit$coef),logFC=fit$coef[,colId],PValue=fit$p.value[,colId])
-        write.table(top,paste("stat",fName3,".txt",sep=""), sep="\t", col.names=T, row.names=F, quote=F)
-
-
-        i=which(maxCntVec>=minCnt)
-        j=which(dgeT$samples$treatment2%in%c("gamma-rays","Sham") & dgeT$samples$experimentNo%in%c("A1402"))
-        dgeF=dgeT[i,j]
-        dgeF$samples$group=as.factor(as.character(dgeF$samples$treatment2))
-        fName3=paste("_gammaVsSham_A1402",fName2,"_voom_minCnt",minCnt,sep="")
-        #design = model.matrix(~as.factor(treatment2), data=dgeF$samples)
-        mod = model.matrix(~as.factor(treatment2), data=dgeF$samples)
-        mod0 = model.matrix(~1, data=dgeF$samples)
-        svObj=sva(lcpmT[i,j],mod,mod0)
-        #svObj = svaseq(10^6*cpmT[i,j],mod,mod0)
-        dat=svObj$sv; colnames(dat)=paste("sv",1:ncol(dat),sep="")
-        design = cbind(mod,dat)
-        dat <- voom(dgeF,design,save.plot=F)
-        #save(dat,design,file=paste("voom",fName3,".RData",sep=""))
-        fit <- eBayes(lmFit(dat,design))
-        fit2=fit
-        rm(dat)
-        colId=2
-        top=cbind(geneId=rownames(fit$coef),logFC=fit$coef[,colId],PValue=fit$p.value[,colId])
-        write.table(top,paste("stat",fName3,".txt",sep=""), sep="\t", col.names=T, row.names=F, quote=F)
-
-        fName3=paste("_",grpName[2],"Vs",capWords(grpName[1]),subsetFlag,fName2,sep="")
-
-        colId=2
-        png(paste("coef",fName3,".png",sep=""))
-        par(mfrow=c(2,2))
-        lim=range(c(fit0$coef[,colId],fit1$coef[,colId],fit2$coef[,colId]),na.rm=T)
-        x1=fit1$coef[,colId]; x2=fit2$coef[,colId]
-        plot(x1,x2,xlim=lim,ylim=lim,main=paste("Gamma vs. sham\nPearson corr ",round(cor(x1,x2,use="complete.obs",method="pearson"),2),sep=""),xlab="A1014: Coef",ylab="A1402: Coef")
-        abline(c(0,1))
-        x1=fit0$coef[,colId]; x2=fit1$coef[,colId]
-        plot(x1,x2,xlim=lim,ylim=lim,main=paste("Gamma vs. sham\nPearson corr ",round(cor(x1,x2,use="complete.obs",method="pearson"),2),sep=""),xlab="A1402A1014 SV: Coef",ylab="A1014: Coef")
-        abline(c(0,1))
-        x1=fit0$coef[,colId]; x2=fit2$coef[,colId]
-        plot(x1,x2,main=paste("Gamma vs. sham\nPearson corr ",round(cor(x1,x2,use="complete.obs",method="pearson"),2),sep=""),xlab="A1014A1402 SV: Coef",ylab="A1402: Coef")
-        abline(c(0,1))
-        dev.off()
-
-
-        colId=2
-        png(paste("pv",fName3,".png",sep=""))
-        par(mfrow=c(2,2))
-        lim=range(c(fit0$p.value[,colId],fit1$p.value[,colId],fit2$p.value[,colId]),na.rm=T)
-        plot(fit1$p.value[,colId],fit2$p.value[,colId],xlim=lim,ylim=lim,main="Gamma vs. sham",xlab="A1014: Coef",ylab="A1402: Coef")
-        abline(c(0,1))
-        plot(fit0$p.value[,colId],fit2$p.value[,colId],xlim=lim,ylim=lim,main="Gamma vs. sham",xlab="A1402A1014 SV: Coef",ylab="A1014: Coef")
-        abline(c(0,1))
-        plot(fit0$p.value[,colId],fit1$p.value[,colId],main="Gamma vs. sham",xlab="A1014A1402 SV: Coef",ylab="A1402: Coef")
-        abline(c(0,1))
-        dev.off()
-
-        colId=2
-        png(paste("histogram_pv",fName3,".png",sep=""))
-        par(mfrow=c(2,2))
-        lim=range(c(fit0$p.value[,colId],fit1$p.value[,colId],fit2$p.value[,colId]),na.rm=T)
-        hist(fit0$p.value[,colId],main="A1402A1014 SV: Gamma vs. sham",xlab="P-value")
-        hist(fit1$p.value[,colId],main="A1014: Gamma vs. sham",xlab="P-value")
-        hist(fit2$p.value[,colId],main="A1402:Gamma vs. sham",xlab="P-value")
-        dev.off()
-
-
-        colId=2
-        png(paste("pv",fName3,".png",sep=""))
-        par(mfrow=c(2,2))
-        lim=c(-3,3)
-        plot(alcpmT[i1],log10(stat_1$pv)-log10(statW$pv[i1]),ylim=lim,main=paste(subsetName,compName,"\nN = ",nrow(stat_1),sep=""),xlab="Avg logCPM",ylab="log10(PV-limma)-log10(PV-wilcox)",cex=.2,pch=20,cex.main=2.5,cex.axis=2,cex.lab=1.5)
-        abline(h=0,col="red")
-        lim=range(c(fit0$p.value[,colId],fit1$p.value[,colId],fit2$p.value[,colId]),na.rm=T)
-        plot(fit1$p.value[,colId],fit2$p.value[,colId],xlim=lim,ylim=lim,main="Gamma vs. sham",xlab="A1014: Coef",ylab="A1402: Coef")
-        abline(c(0,1))
-        plot(fit0$p.value[,colId],fit2$p.value[,colId],xlim=lim,ylim=lim,main="Gamma vs. sham",xlab="A1402A1014 SV: Coef",ylab="A1014: Coef")
-        abline(c(0,1))
-        plot(fit0$p.value[,colId],fit1$p.value[,colId],main="Gamma vs. sham",xlab="A1014A1402 SV: Coef",ylab="A1402: Coef")
-        abline(c(0,1))
-        dev.off()
-
-
-        pThres=0.05
-        table(fit1$p.value[,colId]<pThres,fit2$p.value[,colId]<pThres)
-        table(fit0$p.value[,colId]<pThres,fit1$p.value[,colId]<pThres)
-        table(fit0$p.value[,colId]<pThres,fit2$p.value[,colId]<pThres)
-
-    }
-}
 
 ## -----------------------------------------

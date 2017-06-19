@@ -96,12 +96,13 @@ library(qvalue)
 
 dir("results/rnaSeq/deGene",pattern="stat_")
 
-plotFlag="scatterPlot_topGenes"
 plotFlag="plotAveLogCPMvsVoomWilcoxPV"
 plotFlag="dePlots"
+plotFlag="scatterPlot_topGenes"
 
 fName1="_rnaSeq_p53"
 datadir="results/rnaSeq/deGene/"
+datadir="./"
 
 colIdPV="pv"; colNamePV="PV"; pThres=10^-6
 colIdPV="qv"; colNamePV="QV"; pThres=0.05
@@ -121,264 +122,304 @@ compFlag3="_edgeR"
 compFlag3="_wilcox_voom"
 compFlag3="_voom"
 
+## --------------
 minCntFlag=c(10)
 minCntFlag=c(1)
 compFlag3="_voom_sva"
 compFlag3="_sva"
 
-#subsetFlag=""; compFlag1=c("_A1026VsA1014"); compThis="wilcox"
-#subsetFlag="_A1014A1402"; compFlag1=c("_gammaVsSham"); compThis="wilcox"
+#subsetList=""; compFlag1=c("_A1026VsA1014"); compThis="wilcox"
+#subsetList="_A1014A1402"; compFlag1=c("_gammaVsSham"); compThis="wilcox"
 
 compThis0="wilcox"
 
-compList0="_A1026VsA1014"; subsetFlag=""
-compList0=paste("_",c("capeGamma"),"VsSham",sep=""); subsetFlag=""
-compList0="_gammaVsSham"; subsetFlag="_A1014A1402"
-compList0=paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe"),"VsSham",sep=""); subsetFlag=""
+varType="categorical"
+compList0="_A1026VsA1014"; subsetList=""
+compList0=paste("_",c("capeGamma"),"VsSham",sep=""); subsetList=""
+compList0="_gammaVsSham"; subsetList="_A1014A1402"
+compList0=paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe"),"VsSham",sep=""); subsetList=""
 
-for (compFlag0 in compList0) {
-    statW=read.table(paste(datadir,"stat",compFlag0,subsetFlag,fName1,"_",compThis0,".txt",sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T)
-    names(statW)=c("geneId","log2FC","pv")
-    statW$qv=NA
-    i=which(!is.na(statW$pv))
-    statW$qv[i]=qvalue(statW$pv[i])$qvalues
+## --------------
+compFlag3="_voom_sva"
+compFlag3="_voom"
+compFlag3="_sva"
+compThis0=NULL
+varType="continuous"
+compList0="_slope"
+subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","sham"),sep=""))
 
-    compList1=compFlag0
+## --------------
 
-    out=NULL
-    if (compFlag3=="") {
-        if (onePlotFlag) {
-            if (compFlag3=="") {
-                if (plotFlag=="plotAveLogCPMvsVoomWilcoxPV") {
-                    png(paste(plotFlag,subsetFlag,fName1,".png",sep=""),width=3*240,height=2*240)
-                    par(mfcol=c(2,3))
-                } else {
-                    png(paste(plotFlag,subsetFlag,fName1,".png",sep=""),width=4*240,height=2*240)
-                    par(mfcol=c(2,4))
-                }
-            } else {
-                if (plotFlag=="plotAveLogCPMvsVoomWilcoxPV") {
-                    png(paste(plotFlag,subsetFlag,fName1,".png",sep=""),width=3*240,height=2*240)
-                    par(mfcol=c(2,3))
-                } else {
-                    png(paste(plotFlag,subsetFlag,fName1,".png",sep=""),width=6*240,height=2*240)
-                    par(mfcol=c(2,6))
-                }
+for (subsetFlag in subsetList) {
+    for (compFlag0 in compList0) {
+        if (compFlag3!="") {
+            x=dir(datadir,pattern=paste("stat",compFlag0,sep=""))
+            x=x[grep(paste(subsetFlag,fName1,sep=""),x)]
+            x=x[grep(compFlag3,x)]
+            if (length(x)==0) {
+                next
             }
         }
-    }
-    for (compFlag1 in compList1) {
-        if (compFlag3=="") compList=compFlag1
-        if (compFlag3=="_edgerVsVoom") compList=c("edgeR",paste("voom_minCnt",minCntFlag,sep=""))
-        if (compFlag3=="_voom") compList=paste("voom_minCnt",minCntFlag,sep="")
-        if (compFlag3=="_edgeR") compList=paste("edgeR_minCnt",minCntFlag,sep="")
-        if (compFlag3=="_wilcox_voom") compList=c("wilcox",paste("voom_minCnt",minCntFlag,sep=""))
-        if (compFlag3=="_voom_sva") compList=paste("voom",c("","_sva"),"_minCnt",minCntFlag,sep="")
-        if (compFlag3=="_sva") compList=paste("voom_sva_minCnt",minCntFlag,sep="")
-        if (compFlag3!="") {
+        if (!is.null(compThis0)) {
+            statW=read.table(paste(datadir,"stat",compFlag0,subsetFlag,fName1,"_",compThis0,".txt",sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T)
+            names(statW)=c("geneId","log2FC","pv")
+            statW$qv=NA
+            i=which(!is.na(statW$pv))
+            statW$qv[i]=qvalue(statW$pv[i])$qvalues
+        }
+
+        compList1=compFlag0
+
+        out=NULL
+        if (compFlag3=="") {
             if (onePlotFlag) {
                 if (compFlag3=="") {
                     if (plotFlag=="plotAveLogCPMvsVoomWilcoxPV") {
-                        png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=3*240,height=2*240)
+                        png(paste(plotFlag,subsetFlag,fName1,".png",sep=""),width=3*240,height=2*240)
                         par(mfcol=c(2,3))
-                    } else if (plotFlag=="dePlots") {
-                        png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=4*240,height=2*240)
+                    } else {
+                        png(paste(plotFlag,subsetFlag,fName1,".png",sep=""),width=4*240,height=2*240)
                         par(mfcol=c(2,4))
                     }
                 } else {
                     if (plotFlag=="plotAveLogCPMvsVoomWilcoxPV") {
-                        ##png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=length(compList)*240,height=2*240)
-                        ##par(mfcol=c(2,ceiling(length(compList)/2)))
-                        #png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=(length(compList))*2*240,height=2*240)
-                        #par(mfcol=c(1,length(compList)))
-                        png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=5*240,height=1*240)
-                        par(mfrow=c(1,5))
-                    } else if (plotFlag=="dePlots") {
-                        png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=length(compList)*240,height=2*240)
-                        par(mfcol=c(2,length(compList)))
-                        #png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=5*240,height=2*240)
-                        #par(mfcol=c(2,5))
+                        png(paste(plotFlag,subsetFlag,fName1,".png",sep=""),width=3*240,height=2*240)
+                        par(mfcol=c(2,3))
+                    } else {
+                        png(paste(plotFlag,subsetFlag,fName1,".png",sep=""),width=6*240,height=2*240)
+                        par(mfcol=c(2,6))
                     }
                 }
             }
         }
-        for (compThis in compList) {
-            compFlag2=compFlag1
-            colGeneId="geneId"
-            #stat_1=read.table(paste(datadir,"stat",compFlag1,subsetFlag,fName1,"_",compThis,".txt",sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T)
-            x=dir(datadir,pattern=paste("stat",compFlag1,sep=""))
-            x=x[grep(paste(subsetFlag,fName1,"_",compThis,".txt",sep=""),x)]
-            if (length(x)>1) {
-                x=x[grep(paste("_",c("exptNoAdj","investAdj"),subsetFlag,fName1,sep="",collapse="|"),x)]
-            }
-            cat("===========",x,"==============\n")
-            #stat_1=read.table(paste(datadir,"stat",compFlag1,subsetFlag,fName1,"_",compThis,".txt",sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T)
-            stat_1=read.table(paste(datadir,x,sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T)
-            names(stat_1)=c("geneId","log2FC","pv")
-            ann_1=ann10
-            i1=match(stat_1[,colGeneId],ann_1[,colGeneId])
-            samId=1:nrow(phen10)
-            subsetName=""
-            switch(subsetFlag,
-            "_A1014A1402"={
-                samId=which(phen10$experimentNo%in%c("A1014","A1402"))
-                subsetName="A1014, A1402: "
-            }
-            )
-            switch(compFlag1,
-                   "_A1026VsA1014"={
-                       compName="A1026 vs. A1014"
-                       grpUniq=c("A1014","A1026")
-                       varList="experimentNo"
-                   },
-                   "_capeVsSham"={
-                       compName="CAPE vs. sham"
-                       grpUniq=c("Sham","gamma-rays")
-                       varList="treatment2"
-                   },
-                   "_capeGammaVsSham"={
-                       compName="CAPE+gamma vs. sham"
-                       grpUniq=c("Sham","gamma-rays")
-                       varList="treatment2"
-                   },
-                   "_gammaVsSham"={
-                       compName="Gamma vs. sham"
-                       grpUniq=c("Sham","gamma-rays")
-                       varList="treatment2"
-                   },
-                   "_gammaTeVsSham"={
-                       compName="Gamma-TE vs. sham"
-                       grpUniq=c("Sham","gamma-rays")
-                       varList="treatment2"
-                   },
-                   "_hzeVsSham"={
-                       compName="HZE vs. sham"
-                       grpUniq=c("Sham","gamma-rays")
-                       varList="treatment2"
-                   },
-                   "_hzeTeVsSham"={
-                       compName="HZE-TE vs. sham"
-                       grpUniq=c("Sham","gamma-rays")
-                       varList="treatment2"
-                   }
-            )
-            samId=samId[which(phen10[samId,varList]%in%grpUniq)]
-            stat_1$qv=NA
-            i=which(!is.na(stat_1$pv))
-            stat_1$qv[i]=qvalue(stat_1$pv[i])$qvalues
-            #if (compFlag3!="") compName=paste(compThis,", ",compName,sep="")
-            header=paste(subsetName,compName,sep="")
-            header=paste(subsetName,compName,sep="")
-            fName2=paste(compFlag2,subsetFlag,fName1,"_",compThis,sep="")
-            fName2=paste(compFlag2,subsetFlag,fName1,sep="")
-            if (all(is.na(stat_1$log2FC))) {
-                stat_1$log2FC=apply(lcpmT[,which(phen10[,varList]==grpUniq[2])],1,mean,na.rm=T)-apply(lcpmT[,which(phen10[,varList]==grpUniq[1])],1,mean,na.rm=T)
-            }
-            if (plotFlag=="plotAveLogCPMvsVoomWilcoxPV") {
-                lim=c(-3,3)
-                #plot(alcpmT[i1],log10(stat_1$pv)-log10(statW$pv[i1]),ylim=lim,main=paste(header,"\nN = ",nrow(stat_1),sep=""),xlab="Avg logCPM",ylab="log10(PV-limma)-log10(PV-wilcox)",cex=.2,pch=20,cex.main=2.5,cex.axis=2,cex.lab=1.5)
-                plot(alcpmT[i1],log10(stat_1$pv)-log10(statW$pv[i1]),ylim=lim,main=paste(header,"\nN = ",nrow(stat_1),sep=""),xlab="Avg logCPM",ylab="log10(PV-limma)-log10(PV-wilcox)",cex=.2,pch=20,cex.main=1,cex.axis=1.5,cex.lab=1.5)
-                abline(h=0,col="red")
-            } else if (plotFlag=="scatterPlot_topGenes") {
-                for (signifFlag in c("_topGene","_signifWilcoxNotVoom","_signifVoomNotWilcox")) {
-                    if (compThis=="wilcox" & signifFlag%in%c("_signifWilcoxNotVoom","_signifVoomNotWilcox")) next
-                    switch(signifFlag,
-                    "_topGene"={
-                        ii=order(stat_1$pv)[1:64]
-                    },
-                    "_signifWilcoxNotVoom"={
-                        ii=order(stat_1$pv,decreasing=T)
-                        #ii=ii[which(statW[i1[ii],colNamePV]<pThres)]
-                        ii=ii[which(statW$pv[i1[ii]]<pThres)]
-                        ii=ii[1:min(64,length(ii))]
-                    },
-                    "_signifVoomNotWilcox"={
-                        ii=order(statW$pv[i1],decreasing=T)
-                        #ii=ii[which(stat_1[ii,colNamePV]<pThres)]
-                        ii=ii[which(stat_1$pv[ii]<pThres)]
-                        ii=ii[1:min(64,length(ii))]
-                    }
-                    )
-                    subDir=""
-                    if (T) {
-                        subDir=paste(compThis,signifFlag,sep="")
-                        if (!file.exists(subDir)){
-                            dir.create(file.path(subDir))
+        for (compFlag1 in compList1) {
+            if (compFlag3=="") compList=compFlag1
+            if (compFlag3=="_edgerVsVoom") compList=c("edgeR",paste("voom_minCnt",minCntFlag,sep=""))
+            if (compFlag3=="_voom") compList=paste("voom_minCnt",minCntFlag,sep="")
+            if (compFlag3=="_edgeR") compList=paste("edgeR_minCnt",minCntFlag,sep="")
+            if (compFlag3=="_wilcox_voom") compList=c("wilcox",paste("voom_minCnt",minCntFlag,sep=""))
+            if (compFlag3=="_voom_sva") compList=paste("voom",c("","_sva"),"_minCnt",minCntFlag,sep="")
+            if (compFlag3=="_sva") compList=paste("voom_sva_minCnt",minCntFlag,sep="")
+            if (compFlag3!="") {
+                if (onePlotFlag) {
+                    if (compFlag3=="") {
+                        if (plotFlag=="plotAveLogCPMvsVoomWilcoxPV") {
+                            png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=3*240,height=2*240)
+                            par(mfcol=c(2,3))
+                        } else if (plotFlag=="dePlots") {
+                            png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=4*240,height=2*240)
+                            par(mfcol=c(2,4))
                         }
-                        subDir=paste(subDir,"/",sep="")
-                    }
-                    png(paste(subDir,plotFlag,"_",compThis,compFlag1,subsetFlag,"_%1d.png",sep=""),width=8*2*240,height=4*2*240)
-                    par(mfcol=c(2,4))
-                    for (i in ii) {
-                        lim=NULL
-                        boxplot(lcpmT[i1[i],samId]~phen10[samId,varList],ylim=lim,main=paste(header,"\n",ann10$geneId[i1[i]],", pv ",signif(stat_1$pv[i],2),sep=""),ylab="log2(CPM)",cex.main=2.5,cex.axis=4,cex.lab=1.5)
-                        for (grpId in 1:length(grpUniq)) {
-                            j=which(phen10[samId,varList]==grpUniq[grpId])
-                            points(rep(grpId,length(j)),lcpmT[i1[i],samId[j]],col="black",cex=5)
-                            lines(grpId+c(-.4,.4),rep(mean(lcpmT[i1[i],samId[j]]),2),col="green")
+                    } else {
+                        if (plotFlag=="plotAveLogCPMvsVoomWilcoxPV") {
+                            ##png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=length(compList)*240,height=2*240)
+                            ##par(mfcol=c(2,ceiling(length(compList)/2)))
+                            #png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=(length(compList))*2*240,height=2*240)
+                            #par(mfcol=c(1,length(compList)))
+                            png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=5*240,height=1*240)
+                            par(mfrow=c(1,5))
+                        } else if (plotFlag=="dePlots") {
+                            png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=length(compList)*240,height=2*240)
+                            par(mfcol=c(2,length(compList)))
+                            #png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=5*240,height=2*240)
+                            #par(mfcol=c(2,5))
                         }
                     }
-                    dev.off()
                 }
-            } else {
-                #i1=match(stat_1[,colGeneId],ann_1[,colGeneId])
-                ann_1=ann_1[i1,]
-                cat("\n\n",header,"\n",sep="")
-                x=table(stat_1$log2FC>0,stat_1[,colIdPV]<pThres)
-                rownames(x)=c("Down","Up")[match(rownames(x),c("FALSE","TRUE"))]
-                colnames(x)=paste(colNamePV,c(">=","<"),pThres,sep="")[match(colnames(x),c("FALSE","TRUE"))]
-                print(x)
-                
-                if (F) {
-                    lim=c(0,1)
-                    png(paste("tmp_",fName,".png",sep=""))
-                    plot(stat$pvBeta[i],stat$qvBeta[i],xlim=lim,ylim=lim,xlab="P-value",ylab="Q-value",pch=19,cex.axis=1.5,cex.lab=1.5,main=header)
-                    abline(0,1)
-                    dev.off()
+            }
+            for (compThis in compList) {
+                compFlag2=compFlag1
+                colGeneId="geneId"
+                #stat_1=read.table(paste(datadir,"stat",compFlag1,subsetFlag,fName1,"_",compThis,".txt",sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T)
+                x=dir(datadir,pattern=paste("stat",compFlag1,sep=""))
+                x=x[grep(paste(subsetFlag,fName1,"_",compThis,".txt",sep=""),x)]
+                if (length(x)>1) {
+                    x=x[grep(paste("_",c("exptNoAdj","investAdj","treatAdj"),subsetFlag,fName1,sep="",collapse="|"),x)]
+                } else if (length(x)==0) {
+                    next
+                }
+                cat("===========",x,"==============\n")
+                #stat_1=read.table(paste(datadir,"stat",compFlag1,subsetFlag,fName1,"_",compThis,".txt",sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T)
+                stat_1=read.table(paste(datadir,x,sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T)
+                names(stat_1)=c("geneId","log2FC","pv")
+                ann_1=ann10
+                i1=match(stat_1[,colGeneId],ann_1[,colGeneId])
+                samId=1:nrow(phen10)
+                subsetName=""
+                switch(subsetFlag,
+                "_A1014A1402"={
+                    samId=which(phen10$experimentNo%in%c("A1014","A1402"))
+                    subsetName="A1014, A1402: "
+                }
+                )
+                switch(compFlag1,
+                       "_A1026VsA1014"={
+                           compName="A1026 vs. A1014"
+                           grpUniq=c("A1014","A1026")
+                           varList="experimentNo"
+                       },
+                       "_capeVsSham"={
+                           compName="CAPE vs. sham"
+                           grpUniq=c("Sham","gamma-rays")
+                           varList="treatment2"
+                       },
+                       "_capeGammaVsSham"={
+                           compName="CAPE+gamma vs. sham"
+                           grpUniq=c("Sham","gamma-rays")
+                           varList="treatment2"
+                       },
+                       "_gammaVsSham"={
+                           compName="Gamma vs. sham"
+                           grpUniq=c("Sham","gamma-rays")
+                           varList="treatment2"
+                       },
+                       "_gammaTeVsSham"={
+                           compName="Gamma-TE vs. sham"
+                           grpUniq=c("Sham","gamma-rays")
+                           varList="treatment2"
+                       },
+                       "_hzeVsSham"={
+                           compName="HZE vs. sham"
+                           grpUniq=c("Sham","gamma-rays")
+                           varList="treatment2"
+                       },
+                       "_hzeTeVsSham"={
+                           compName="HZE-TE vs. sham"
+                           grpUniq=c("Sham","gamma-rays")
+                           varList="treatment2"
+                       },
+                       "_slope"={
+                           compName="Slope"
+                           grpUniq=NULL
+                           varList="slope"
+                       }
+                )
+                if (!is.null(grpUniq)) {
+                    samId=samId[which(phen10[samId,varList]%in%grpUniq)]
+                }
+                stat_1$qv=NA
+                i=which(!is.na(stat_1$pv))
+                stat_1$qv[i]=qvalue(stat_1$pv[i])$qvalues
+                #if (compFlag3!="") compName=paste(compThis,", ",compName,sep="")
+                header=paste(subsetName,compName,sep="")
+                header=paste(subsetName,compName,sep="")
+                fName2=paste(compFlag2,subsetFlag,fName1,"_",compThis,sep="")
+                fName2=paste(compFlag2,subsetFlag,fName1,sep="")
+                if (!is.null(grpUniq)) {
+                    if (all(is.na(stat_1$log2FC))) {
+                        stat_1$log2FC=apply(lcpmT[,which(phen10[,varList]==grpUniq[2])],1,mean,na.rm=T)-apply(lcpmT[,which(phen10[,varList]==grpUniq[1])],1,mean,na.rm=T)
+                    }
+                }
+                if (plotFlag=="plotAveLogCPMvsVoomWilcoxPV") {
+                    lim=c(-3,3)
+                    #plot(alcpmT[i1],log10(stat_1$pv)-log10(statW$pv[i1]),ylim=lim,main=paste(header,"\nN = ",nrow(stat_1),sep=""),xlab="Avg logCPM",ylab="log10(PV-limma)-log10(PV-wilcox)",cex=.2,pch=20,cex.main=2.5,cex.axis=2,cex.lab=1.5)
+                    plot(alcpmT[i1],log10(stat_1$pv)-log10(statW$pv[i1]),ylim=lim,main=paste(header,"\nN = ",nrow(stat_1),sep=""),xlab="Avg logCPM",ylab="log10(PV-limma)-log10(PV-wilcox)",cex=.2,pch=20,cex.main=1,cex.axis=1.5,cex.lab=1.5)
+                    abline(h=0,col="red")
+                } else if (plotFlag=="scatterPlot_topGenes") {
+                    for (signifFlag in c("_topGene","_signifWilcoxNotVoom","_signifVoomNotWilcox")) {
+                        if ((is.null(compThis0) | compThis=="wilcox") & signifFlag%in%c("_signifWilcoxNotVoom","_signifVoomNotWilcox")) next
+                        switch(signifFlag,
+                        "_topGene"={
+                            ii=order(stat_1$pv)[1:64]
+                        },
+                        "_signifWilcoxNotVoom"={
+                            ii=order(stat_1$pv,decreasing=T)
+                            #ii=ii[which(statW[i1[ii],colNamePV]<pThres)]
+                            ii=ii[which(statW$pv[i1[ii]]<pThres)]
+                            ii=ii[1:min(64,length(ii))]
+                        },
+                        "_signifVoomNotWilcox"={
+                            ii=order(statW$pv[i1],decreasing=T)
+                            #ii=ii[which(stat_1[ii,colNamePV]<pThres)]
+                            ii=ii[which(stat_1$pv[ii]<pThres)]
+                            ii=ii[1:min(64,length(ii))]
+                        }
+                        )
+                        subDir=""
+                        if (T) {
+                            subDir=paste(compThis,signifFlag,sep="")
+                            if (!file.exists(subDir)){
+                                dir.create(file.path(subDir))
+                            }
+                            subDir=paste(subDir,"/",sep="")
+                        }
+                        png(paste(subDir,plotFlag,"_",compThis,compFlag1,subsetFlag,"_%1d.png",sep=""),width=8*2*240,height=4*2*240)
+                        par(mfcol=c(2,4))
+                        for (i in ii) {
+                            lim=NULL
+                            if (varType=="categorical") {
+                                boxplot(lcpmT[i1[i],samId]~phen10[samId,varList],ylim=lim,main=paste(header,"\n",ann10$geneId[i1[i]],", pv ",signif(stat_1$pv[i],2),sep=""),ylab="log2(CPM)",cex.main=2.5,cex.axis=4,cex.lab=1.5)
+                                for (grpId in 1:length(grpUniq)) {
+                                    j=which(phen10[samId,varList]==grpUniq[grpId])
+                                    points(rep(grpId,length(j)),lcpmT[i1[i],samId[j]],col="black",cex=5)
+                                    lines(grpId+c(-.4,.4),rep(mean(lcpmT[i1[i],samId[j]]),2),col="green")
+                                }
+                            } else {
+                                plot(phen10[samId,varList],lcpmT[i1[i],samId],ylim=lim,main=paste(header,"\n",ann10$geneId[i1[i]],", pv ",signif(stat_1$pv[i],2),sep=""),xlab=varList,ylab="log2(CPM)",cex.main=2.5,cex.axis=4,cex.lab=1.5)
+                            }
+                        }
+                        dev.off()
+                    }
+                } else {
+                    #i1=match(stat_1[,colGeneId],ann_1[,colGeneId])
+                    ann_1=ann_1[i1,]
+                    cat("\n\n",header,"\n",sep="")
+                    x=table(stat_1$log2FC>0,stat_1[,colIdPV]<pThres)
+                    rownames(x)=c("Down","Up")[match(rownames(x),c("FALSE","TRUE"))]
+                    colnames(x)=paste(colNamePV,c(">=","<"),pThres,sep="")[match(colnames(x),c("FALSE","TRUE"))]
+                    print(x)
                     
-                    png(paste("qqplot_",fName,".png",sep=""))
-                    pvs=sort(na.exclude(stat$pvBeta[i]))
-                    qqplot(-log10(runif(length(pvs),0,1)),-log10(pvs),xlab="Expected -log10(p-values) by random",ylab="Observed -log10(p-values)",pch=19,cex.axis=1.5,cex.lab=1.5,main=header)
-                    abline(0,1)
-                    dev.off()
-                }
-                
-                if (!onePlotFlag) png(paste("histogram_",compFlag1,subsetFlag,".png",sep=""))
-                hist(stat_1$pv,xlab="P-value",pch=19,cex.axis=1.5,cex.lab=1.5,main=header)
-                if (!onePlotFlag) dev.off()
-                
-                if (!onePlotFlag) png(paste("volcanoPlot_",compFlag1,subsetFlag,"_",tolower(colNamePV),pThres,".png",sep=""))
-                i=which(stat_1[,colIdPV]<pThres)
-                plot(stat_1$log2FC,-log10(stat_1$pv),xlab="Log2 fold change",ylab="-Log10(p-value)",main=paste(header,"\nN=",nrow(stat_1),", no. with ",tolower(colNamePV),"<",pThres,": ",length(i),sep=""),pch=19,cex=.1,cex.axis=1.5,cex.lab=1.5)
-                if (length(i)!=0) points(stat_1$log2FC[i],-log10(stat_1$pv[i]),col="red",pch=19,cex=.2)
-                if (!onePlotFlag) dev.off()
+                    if (F) {
+                        lim=c(0,1)
+                        png(paste("tmp_",fName,".png",sep=""))
+                        plot(stat$pvBeta[i],stat$qvBeta[i],xlim=lim,ylim=lim,xlab="P-value",ylab="Q-value",pch=19,cex.axis=1.5,cex.lab=1.5,main=header)
+                        abline(0,1)
+                        dev.off()
+                        
+                        png(paste("qqplot_",fName,".png",sep=""))
+                        pvs=sort(na.exclude(stat$pvBeta[i]))
+                        qqplot(-log10(runif(length(pvs),0,1)),-log10(pvs),xlab="Expected -log10(p-values) by random",ylab="Observed -log10(p-values)",pch=19,cex.axis=1.5,cex.lab=1.5,main=header)
+                        abline(0,1)
+                        dev.off()
+                    }
+                    
+                    if (!onePlotFlag) png(paste("histogram_",compFlag1,subsetFlag,".png",sep=""))
+                    hist(stat_1$pv,xlab="P-value",pch=19,cex.axis=1.5,cex.lab=1.5,main=header)
+                    if (!onePlotFlag) dev.off()
+                    
+                    if (!onePlotFlag) png(paste("volcanoPlot_",compFlag1,subsetFlag,"_",tolower(colNamePV),pThres,".png",sep=""))
+                    i=which(stat_1[,colIdPV]<pThres)
+                    plot(stat_1$log2FC,-log10(stat_1$pv),xlab="Log2 fold change",ylab="-Log10(p-value)",main=paste(header,"\nN=",nrow(stat_1),", no. with ",tolower(colNamePV),"<",pThres,": ",length(i),sep=""),pch=19,cex=.1,cex.axis=1.5,cex.lab=1.5)
+                    if (length(i)!=0) points(stat_1$log2FC[i],-log10(stat_1$pv[i]),col="red",pch=19,cex=.2)
+                    if (!onePlotFlag) dev.off()
 
-                #out2=stat_1[match(ann_1[,colGeneId],stat_1[,colGeneId]),c("foldChange","log2FC","logCPM","pv","FDR")]
-                out2=stat_1[match(ann_1[,colGeneId],stat_1[,colGeneId]),c("log2FC","pv","qv")]
-                i=order(out2$pv)
-                #i=order(out2$pv); i=i[out2[i,colIdPV]<pThres]
-                out2=out2[i,]
-                names(out2)=paste(names(out2),compFlag2,sep="")
-                out2=cbind(ann_1[i,which(!names(ann_1)%in%c("gene_id"))],out2)
-                for (k in 1:ncol(out2)) {
-                    if (is.character(out2[,k])) {
-                        out2[,k]=gsub(", ...","",out2[,k])
+                    #out2=stat_1[match(ann_1[,colGeneId],stat_1[,colGeneId]),c("foldChange","log2FC","logCPM","pv","FDR")]
+                    out2=stat_1[match(ann_1[,colGeneId],stat_1[,colGeneId]),c("log2FC","pv","qv")]
+                    i=order(out2$pv)
+                    #i=order(out2$pv); i=i[out2[i,colIdPV]<pThres]
+                    out2=out2[i,]
+                    names(out2)=paste(names(out2),compFlag2,sep="")
+                    out2=cbind(ann_1[i,which(!names(ann_1)%in%c("gene_id"))],out2)
+                    for (k in 1:ncol(out2)) {
+                        if (is.character(out2[,k])) {
+                            out2[,k]=gsub(", ...","",out2[,k])
+                        }
+                    }
+                    write.table(out2, file=paste("stat",fName2,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
+                    
+                    if (F) {
+                        write.table(unique(ann_1$geneId), file=paste("ensGeneId_",compFlag1,subsetFlag,".txt",sep=""),col.names=F,row.names=F, sep="\t",quote=F)
+                        i=which(stat_1[,colIdPV]<pThres)
+                        if (length(i)!=0) write.table(unique(ann_1$geneId[i]), file=paste("ensGeneId_pv",pThres,"_",compFlag1,subsetFlag,".txt",sep=""),col.names=F,row.names=F, sep="\t",quote=F)
+                        i=order(stat_1[,colIdPV])[1:200]
+                        write.table(unique(ann_1$geneId[i]), file=paste("ensGeneId_top200_",compFlag1,subsetFlag,".txt",sep=""),col.names=F,row.names=F, sep="\t",quote=F)
                     }
                 }
-                write.table(out2, file=paste("stat",fName2,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
-                
-                if (F) {
-                    write.table(unique(ann_1$geneId), file=paste("ensGeneId_",compFlag1,subsetFlag,".txt",sep=""),col.names=F,row.names=F, sep="\t",quote=F)
-                    i=which(stat_1[,colIdPV]<pThres)
-                    if (length(i)!=0) write.table(unique(ann_1$geneId[i]), file=paste("ensGeneId_pv",pThres,"_",compFlag1,subsetFlag,".txt",sep=""),col.names=F,row.names=F, sep="\t",quote=F)
-                    i=order(stat_1[,colIdPV])[1:200]
-                    write.table(unique(ann_1$geneId[i]), file=paste("ensGeneId_top200_",compFlag1,subsetFlag,".txt",sep=""),col.names=F,row.names=F, sep="\t",quote=F)
-                }
             }
+            if (onePlotFlag & compFlag3!="" & plotFlag!="scatterPlot_topGenes") dev.off()
         }
-        if (onePlotFlag & compFlag3!="" & plotFlag!="scatterPlot_topGenes") dev.off()
+        if (onePlotFlag & compFlag3=="" & plotFlag!="scatterPlot_topGenes") dev.off()
     }
-    if (onePlotFlag & compFlag3=="" & plotFlag!="scatterPlot_topGenes") dev.off()
 }
 
 ## Check log2 fold change direction
@@ -492,9 +533,16 @@ for (compFlag0 in compList0) {
                 compName="HZE-TE vs. sham"
                 grpUniq=c("Sham","gamma-rays")
                 varList="treatment2"
+            },
+            "_slope"={
+                compName="Slope"
+                grpUniq=NULL
+                varList="slope"
             }
             )
-            samId=samId[which(phen10[samId,varList]%in%grpUniq)]
+            if (!is.null(grpUniq)) {
+                samId=samId[which(phen10[samId,varList]%in%grpUniq)]
+            }
             stat_1$qv=NA
             i=which(!is.na(stat_1$pv))
             stat_1$qv[i]=qvalue(stat_1$pv[i])$qvalues
