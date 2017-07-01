@@ -329,10 +329,10 @@ library(sva)
 
 fName2="_rnaSeq_p53"
 
-
 compList=paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe"),"VsSham",sep=""); subsetList=""
 compList="_A1026VsA1014"; subsetList=""
 compList="_gammaVsSham"; subsetList="_A1014A1402"
+compList="_capeGammaVsGamma"; subsetList=""
 
 compList="_slope"
 subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe"),sep=""))
@@ -361,6 +361,9 @@ for (subsetFlag in subsetList) {
         },
         "_hzeTeVsSham"={
             varList="treatment2"; grpUniq=c("Sham","HZE-TE"); grpName=c("sham","hzeTe")
+        },
+        "_capeGammaVsGamma"={
+            varList="treatment2"; grpUniq=c("gamma-rays","CAPE+ gamma-rays"); grpName=c("gamma","capeGamma")
         },
         "_slope"={
             varType="continuous"

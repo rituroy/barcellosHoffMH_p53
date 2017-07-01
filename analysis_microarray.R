@@ -1,4 +1,6 @@
 ## USE R 2.4.0 - results different in R 2.2.1
+## Run section 2 before sections of higher order
+
 
 ## ---------------------------------
 
@@ -19,25 +21,29 @@ if (computerFlag=="cluster") {
 library(oligo)
 
 ##############################################
+##############################################
+## Section 1
+## Process data
+
 dataset="A0501_A0508"
 dataset="A1020"
 
 fName=paste("_",dataset,sep="")
 
-datadir <- "data/"
-phen <- read.table(file = paste(datadir,"phen",fName,".txt", sep=""), header = T, sep = "\t", quote="", comment.char="", as.is=T)
+datadir="data/"
+phen=read.table(file=paste(datadir,"phen",fName,".txt", sep=""), header=T, sep="\t", quote="", comment.char="", as.is=T)
 #phen=phen[1:4,]
 
 fileList=paste(datadir,"cel/",dataset,"/",phen$celFileName,sep="")
 
 if (F) {
-datadir="tmp/"
-fileList=dir(datadir,pattern="CEL")
-phen=data.frame(id=sapply(fileList,function(x) {strsplit(x,"_")[[1]][1]},USE.NAMES=F),celFileName=fileList,type=c(0,0,1,1),stringsAsFactors=F)
-fileList=paste(datadir,fileList,sep="")
+    datadir="tmp/"
+    fileList=dir(datadir,pattern="CEL")
+    phen=data.frame(id=sapply(fileList,function(x) {strsplit(x,"_")[[1]][1]},USE.NAMES=F),celFileName=fileList,type=c(0,0,1,1),stringsAsFactors=F)
+    fileList=paste(datadir,fileList,sep="")
 }
 
-affyGeneFS <- read.celfiles(filenames=fileList)
+affyGeneFS=read.celfiles(filenames=fileList)
 phen=phen[match(colnames(affyGeneFS),phen$celFileName),]
 sampleNames(affyGeneFS)=phen$id
 
@@ -48,10 +54,10 @@ if (F) {
 }
 
 ## ---------------------------
-fit <- fitProbeLevelModel(affyGeneFS)
+fit=fitProbeLevelModel(affyGeneFS)
 
 if (F) {
-png(paste("image",fName,"_%03d.png",sep=""),width = 3*240, height = 2*240)
+png(paste("image",fName,"_%03d.png",sep=""),width=3*240, height=2*240)
 image(fit)
 dev.off()
 }
@@ -69,22 +75,22 @@ summary(apply(res,2,median,na.rm=T))
 resR=res
 ## ---------------------------
 
-genePS <- rma(affyGeneFS, target = "probeset")
-geneCore <- rma(affyGeneFS, target = "core")
+genePS=rma(affyGeneFS, target="probeset")
+geneCore=rma(affyGeneFS, target="core")
 
 if (F) {
-    R> featureData(exonPS) <- getNetAffx(exonPS, "probeset")
-    R> featureData(exonCore) <- getNetAffx(exonCore, "transcript")
-    R> featureData(exonFull) <- getNetAffx(exonFull, "transcript")
-    R> featureData(exonExtd) <- getNetAffx(exonExtd, "transcript")
-    R> featureData(geneCore) <- getNetAffx(geneCore, "transcript")
+    R> featureData(exonPS)=getNetAffx(exonPS, "probeset")
+    R> featureData(exonCore)=getNetAffx(exonCore, "transcript")
+    R> featureData(exonFull)=getNetAffx(exonFull, "transcript")
+    R> featureData(exonExtd)=getNetAffx(exonExtd, "transcript")
+    R> featureData(geneCore)=getNetAffx(geneCore, "transcript")
 
     R> exonCore
     R> featureData(exonCore)
     R> varLabels(featureData(exonCore))
     pData(featureData(exonCore))[1:2, "geneassignment"]
 }
-featureData(genePS) <- getNetAffx(genePS, "probeset")
+featureData(genePS)=getNetAffx(genePS, "probeset")
 
 ## ---------------------------
 png(paste("boxplot",fName,".png",sep=""))
@@ -98,7 +104,7 @@ hist(genePS)
 dev.off()
 
 if (F) {
-png(paste("MAplot",fName,"_%03d.png",sep=""),width = 3*240, height = 2*240)
+png(paste("MAplot",fName,"_%03d.png",sep=""),width=3*240, height=2*240)
 par(mfrow=c(2,3))
 MAplot(genePS)
 dev.off()
@@ -127,7 +133,7 @@ if (F) {
     expr=data.frame(probesetid)
     rm(probesetid)
 
-    anno <- read.table(file=paste(dirSrc,"Affymetrix/MoGene1_0st/MoGene-1_0-st-v1.na31.mm9.transcript.txt",sep=""), header=T, sep="\t", quote="", comment.char="", as.is=T)
+    anno=read.table(file=paste(dirSrc,"Affymetrix/MoGene1_0st/MoGene-1_0-st-v1.na31.mm9.transcript.txt",sep=""), header=T, sep="\t", quote="", comment.char="", as.is=T)
     table(anno$transcript_cluster_id==anno$probesetid,exclude=NULL)
 
     table(duplicated(expr$probesetid))
@@ -157,7 +163,7 @@ if (F) {
     rm(anno)
 
     ## --------------------------------------
-    anno2 <- read.table(file=paste(dirSrc,"Affymetrix/MoGene1_0st/anno_MoGene-1_0-st-v1.na31.mm9.transcript.txt",sep=""), header=T, sep="\t", quote="", comment.char="", as.is=T)
+    anno2=read.table(file=paste(dirSrc,"Affymetrix/MoGene1_0st/anno_MoGene-1_0-st-v1.na31.mm9.transcript.txt",sep=""), header=T, sep="\t", quote="", comment.char="", as.is=T)
 
     id=match(expr$probesetid,anno2$probesetid)
     if (any(is.na(id))) {
@@ -273,6 +279,34 @@ save.image("tmp.RData")
 
 #######################################################
 #######################################################
+## Section 2
+## Load processed data
+
+datadir="results/"
+load(paste(datadir,"eset.RData",sep=""))
+load(paste(datadir,"clId.RData",sep=""))
+phen=eset$phen
+datadir="docs/"
+phen2=read.table(paste(datadir,"Suervised cluster RNAseq and Microarray data - microarray.txt",sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T,skip=1)
+names(phen2)[match(c("Sample.ID","Fast.Slopes","X","Sample.ID.1","Slow.Slopes"),names(phen2))]=c("id","slope","X","id2","slope2")
+phen3=phen2
+phen3$id=phen3$id2
+phen3$slope=phen3$slope2
+phen3$slopeCat="slow"
+phen2$slopeCat="fast"
+phen2=rbind(phen2,phen3)
+phen2$id=gsub("-","_",gsub(" ","",phen2$id))
+j=match(phen$id,phen2$id); j1=which(!is.na(j)); j2=j[j1]
+phen$slope=NA
+phen$slopeCat=""
+phen[j1,c("slope","slopeCat")]=phen2[j2,c("slope","slopeCat")]
+phen$slopeCat[which(phen$slopeCat=="")]=NA
+eset$phen=phen
+rm(phen,phen2,phen3)
+
+#######################################################
+#######################################################
+## Section 3
 ## Association of heatmap clusters with clinical variables
 
 datadir=""
@@ -309,9 +343,9 @@ out
 ## DELETE
 
 
-datadir <- ""
-tbl1 <- read.table(file = paste(datadir,"tmp1.txt", sep=""), header = F, sep = "\t", quote="", comment.char="", as.is=T)
-tbl2 <- read.table(file = paste(datadir,"tmp2.txt", sep=""), header = F, sep = "\t", quote="", comment.char="", as.is=T)
+datadir=""
+tbl1=read.table(file=paste(datadir,"tmp1.txt", sep=""), header=F, sep="\t", quote="", comment.char="", as.is=T)
+tbl2=read.table(file=paste(datadir,"tmp2.txt", sep=""), header=F, sep="\t", quote="", comment.char="", as.is=T)
 
 x1=tbl1[,1]
 x2=tbl2[,1]
@@ -327,12 +361,14 @@ write.table(paste("qRscript tmp_mmu.R ",x1[!x1%in%x2],sep=""), file="tmp3.txt",c
 
 #######################################################
 #######################################################
+## Section 4
 
 library(limma)
 library(qvalue)
 library(sva)
 source(paste(dirSrc,"functions/TTest.9.1.6.R",sep=""))
 
+fName1=""
 
 grp=as.factor(eset$phen$group)
 getLog2Mean=function(x) {
@@ -348,52 +384,139 @@ grp=as.integer(eset$phen$group!="Sham")
 grp[which(eset$phen$group=="HZE")]=2
 grp=as.factor(grp)
 grp=as.factor(eset$phen$group)
-contrasts(grp) <- contr.sum(sum(!duplicated(grp)))
-#contrasts(grp) <- contr.treatment(sum(!duplicated(grp)))
+contrasts(grp)=contr.sum(sum(!duplicated(grp)))
+#contrasts(grp)=contr.treatment(sum(!duplicated(grp)))
 design=model.matrix(~0+grp,ref="Sham")
 colnames(design)=sub("(Intercept)","intercept",colnames(design),fixed=T)
-fit <- lmFit(eset$expr[clId,],design)
-contMat <- makeContrasts(gammaVsham=grp_-grpSham,hzeVsham=grpHZE-grpSham,hzeVgamma=grpHZE-grp_,levels=design)
-#contMat <- makeContrasts(gammaVsham=grp1,hzeVsham=grp2,hzeVgamma=grp2-grp1,levels=design)
-#contMat <- makeContrasts(gammaVsham=grp2,hzeVsham=grp3,hzeVgamma=grp3-grp2,levels=design)
-fit2 <- contrasts.fit(fit, contMat)
-fit2 <- eBayes(fit2)
+fit=lmFit(eset$expr[clId,],design)
+contMat=makeContrasts(gammaVsham=grp_-grpSham,hzeVsham=grpHZE-grpSham,hzeVgamma=grpHZE-grp_,levels=design)
+#contMat=makeContrasts(gammaVsham=grp1,hzeVsham=grp2,hzeVgamma=grp2-grp1,levels=design)
+#contMat=makeContrasts(gammaVsham=grp2,hzeVsham=grp3,hzeVgamma=grp3-grp2,levels=design)
+fit2=contrasts.fit(fit, contMat)
+fit2=eBayes(fit2)
 
-grp=as.integer(eset$phen$group!="Sham")
-grp[which(eset$phen$group=="HZE")]=2
+#grp=as.integer(eset$phen$group!="Sham")
+#grp[which(eset$phen$group=="HZE")]=2
 compList=c("gammaVsham","hzeVsham","hzeVgamma")
-tmp=matrix(nrow=nrow(fit2$coef),ncol=length(compList),dimnames=list(rownames(fit2$coef),compList))
-fit3=list(coef=tmp,p.value=tmp)
-fit4=list(coef=tmp,p.value=tmp)
-for (k in 1:length(compList)) {
-    compFlag=compList[k]
-    switch(compFlag,
-    "gammaVsham"={
-        samId=which(grp%in%c(0,1))
-    },
-    "hzeVsham"={
-        samId=which(grp%in%c(0,2))
-    },
-    "hzeVgamma"={
-        samId=which(grp%in%c(1,2))
+
+compList="slope"
+subsetList=c("",paste("_",c("gamma","hze","sham"),sep=""))
+
+colId=2
+for (subsetFlag in subsetList) {
+    tmp=matrix(nrow=nrow(fit2$coef),ncol=length(compList),dimnames=list(rownames(fit2$coef),compList))
+    fit3=list(coef=tmp,p.value=tmp)
+    fit4=list(coef=tmp,p.value=tmp)
+    for (compId in 1:length(compList)) {
+        cat("\n\n===================== ",compFlag,covFlag,subsetFlag,"\n",sep=": ")
+        compFlag=compList[compId]
+        varList2="experimentNo"
+        varType="categorical"
+        switch(compFlag,
+        "gammaVsham"={
+            varList="group"; grpUniq=c("Sham","_"); grpName=c("sham","gamma")
+        },
+        "hzeVsham"={
+            varList="group"; grpUniq=c("Sham","HZE"); grpName=c("sham","hze")
+        },
+        "hzeVgamma"={
+            varList="group"; grpUniq=c("_","HZE"); grpName=c("gamma","hze")
+        },
+        "slope"={
+            varType="continuous"
+            varList="slope"; grpUniq=grpName=NULL
+        }
+        )
+        samId=1:nrow(eset$phen)
+        if (is.null(grpUniq)) {
+            samId=samId[!is.na(eset$phen[samId,varList])]
+        } else {
+            samId=samId[which(eset$phen[samId,varList]%in%grpUniq)]
+        }
+        switch(subsetFlag,
+            "_gamma"={
+                samId=samId[which(eset$phen$group[samId]%in%c("_"))]
+            },
+            "_hze"={
+                samId=samId[which(eset$phen$group[samId]%in%c("HZE"))]
+            },
+            "_sham"={
+                samId=samId[which(eset$phen$group[samId]%in%c("Sham"))]
+            }
+        )
+        phen=eset$phen[samId,]
+        covFlag=""
+        if (varList=="slope") {
+            varList2="group"
+            x=table(phen[,varList2])
+            x=x[which(x!=1)]
+            if (length(x)>1) {
+                covFlag="_treatAdj"
+            } else {
+                varList2="experimentNo"
+                x=table(phen[,varList2])
+                x=x[which(x!=1)]
+                if (length(x)>1) {
+                    covFlag="_exptNoAdj"
+                } else {
+                    covFlag=""
+                    varList2=NULL
+                }
+            }
+            if (covFlag!="") {
+                x=table(phen[,varList2])
+                if (any(x==1)) {
+                    cat("Excluded singular groups ",names(x)[x==1],"\n",sep="")
+                    x=x[which(x!=1)]
+                    samId=samId[which(phen[,varList2]%in%names(x))]
+                    phen=eset$phen[samId,]
+                }
+            }
+        }
+        cat("No. of samples: ",length(samId),"\n",sep="")
+        if (covFlag=="") {
+            modelThis=paste("~",varList,sep="")
+        } else {
+            modelThis=paste("~",varList,"+as.factor(",varList2,")",sep="")
+        }
+        if (varType=="categorical") {
+            modelThis=sub("varList","as.factor(varList)",modelThis)
+        }
+        modelThis=as.formula(modelThis)
+        design=model.matrix(modelThis,data=phen)
+        fit=lmFit(eset$expr[clId,samId],design)
+        fit=eBayes(fit)
+        fit3$coef[,compId]=fit$coef[,colId]
+        fit3$p.value[,compId]=fit$p.value[,colId]
+        out=data.frame(probesetid=rownames(fit$coef),coef=fit$coef[,colId],t=fit$t[,colId],pv=fit$p.value[,colId])
+        write.table(out,file=paste("stat_",compFlag,covFlag,subsetFlag,fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
+        
+        mod=design
+        mod0=model.matrix(as.formula(paste("~as.factor(",varList2,")",sep="")), data=phen)
+        svObj=sva(eset$expr[clId,samId],mod,mod0)
+        if (is.matrix(svObj$sv)) {
+            nm=c(colnames(mod),paste("sv",1:ncol(dat),sep=""))
+        } else if (is.numeric(svObj$sv)) {
+            if (length(svObj$sv)>1) {
+                nm=c(colnames(mod),"sv1")
+            } else {
+                nm=NULL
+            }
+        }
+        if (!is.null(nm)) {
+            #dat=svObj$sv; colnames(dat)=paste("sv",1:ncol(dat),sep="")
+            design=cbind(mod,svObj$sv)
+            colnames(design)=nm
+            fit=lmFit(eset$expr[clId,samId],design)
+            fit=eBayes(fit)
+            fit4$coef[,compId]=fit$coef[,colId]
+            fit4$p.value[,compId]=fit$p.value[,colId]
+            out=data.frame(probesetid=rownames(fit$coef),coef=fit$coef[,colId],t=fit$t[,colId],pv=fit$p.value[,colId])
+            write.table(out,file=paste("stat_",compFlag,covFlag,subsetFlag,"_sva",fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
+        } else {
+            cat("Could not run SVA\n",sep="")
+        }
     }
-    )
-    phen=cbind(eset$phen[samId,],grp=grp[samId])
-    design=model.matrix(~grp+experimentNo,data=phen)
-    fit <- lmFit(eset$expr[clId,samId],design)
-    fit <- eBayes(fit)
-    fit3$coef[,k]=fit$coef[,2]
-    fit3$p.value[,k]=fit$p.value[,2]
-    
-    mod = model.matrix(~as.factor(grp)+as.factor(experimentNo), data=phen)
-    mod0 = model.matrix(~as.factor(experimentNo), data=phen)
-    svObj=sva(eset$expr[clId,samId],mod,mod0)
-    dat=svObj$sv; colnames(dat)=paste("sv",1:ncol(dat),sep="")
-    design = cbind(mod,dat)
-    fit <- lmFit(eset$expr[clId,samId],design)
-    fit <- eBayes(fit)
-    fit4$coef[,k]=fit$coef[,2]
-    fit4$p.value[,k]=fit$p.value[,2]
 }
 
 fitThis=fit3
@@ -485,8 +608,8 @@ legend(3,lim[2]-.1,"mean",col="green",lty="solid")
 dev.off()
 
 ## ----------------------------------------------
-fName1="_moGene2.0"
 fName1="_sva_moGene2.0"
+fName1="_moGene2.0"
 
 colIdPV="pv"; colNamePV="PV"; pThres=10^-6
 colIdPV="qv"; colNamePV="QV"; pThres=0.05
@@ -652,13 +775,13 @@ library(sva)
 
 load("results/eset.RData")
 
-modCom = model.matrix(~as.factor(group), data=eset$phen)
+modCom=model.matrix(~as.factor(group), data=eset$phen)
 
-exprCom=ComBat(dat=eset$expr, batch=eset$phen$experimentNo, mod=modCom, par.prior = TRUE,prior.plots = FALSE)
-#exprComNP=ComBat(dat=eset$expr, batch=eset$phen$experimentNo, mod=modCom, par.prior = FALSE,prior.plots = FALSE)
+exprCom=ComBat(dat=eset$expr, batch=eset$phen$experimentNo, mod=modCom, par.prior=TRUE,prior.plots=FALSE)
+#exprComNP=ComBat(dat=eset$expr, batch=eset$phen$experimentNo, mod=modCom, par.prior=FALSE,prior.plots=FALSE)
 
-mod = model.matrix(~as.factor(group)+as.factor(experimentNo), data=eset$phen)
-mod0 = model.matrix(~as.factor(experimentNo), data=eset$phen)
+mod=model.matrix(~as.factor(group)+as.factor(experimentNo), data=eset$phen)
+mod0=model.matrix(~as.factor(experimentNo), data=eset$phen)
 
 
 numSV=num.sv(eset$expr,mod=mod,method="leek")
