@@ -27,9 +27,13 @@ library(marray)
 library(qvalue)
 library(sva)
 #source(paste(dirSrc,"functions/colorCluster.R",sep=""))
-source(paste(dirSrc,"functions/heatmap.5.5.R",sep=""))
-source(paste(dirSrc,"functions/heatmapAcgh.7.1.R",sep=""))
+#source(paste(dirSrc,"functions/heatmap.5.5.R",sep=""))
+#source(paste(dirSrc,"functions/heatmapAcgh.7.1.R",sep=""))
+source(paste(dirSrc,"functions/heatmap.5.6.R",sep=""))
+source(paste(dirSrc,"functions/heatmapAcgh.7.3.R",sep=""))
 
+limSl=c(0.05,0.2)
+limSl=c(0,0.5)
 
 datType="_stdzCoralHaoxu"
 datType=""
@@ -65,7 +69,7 @@ for (datType in datList) {
         candGene=candGene[!duplicated(toupper(candGene$geneSym)),]
     }
 
-    phenAll=dgeT$samples[,c("id","tubeLabel","sampleId","experimentNo","dataset","treatment","treatment2","lib.size","norm.factors")]
+    phenAll=dgeT$samples[,c("id","tubeLabel","sampleId","experimentNo","dataset","treatment","treatment2","slope","lib.size","norm.factors")]
     names(phenAll)[match(c("treatment2"),names(phenAll))]="group"
     annAll=ann10
     varPred=lcpmT
@@ -264,6 +268,7 @@ for (datType in datList) {
                             varName=sub("treatment2","group",varName)
                         }
                         varList=c("experimentNo","group")
+                        varList=c("slope","experimentNo","group")
                         varName=paste(varList," ",sep="")
 
                         varListAll=varList; varNameAll=varName
@@ -285,10 +290,16 @@ for (datType in datList) {
                             rowCol=matrix(nrow=length(varFList),ncol=nrow(annRow))
                             for (varId in 1:length(varFList)) {
                                 if (sum(!duplicated(annRowAll[!is.na(annRowAll[,varFList[varId]]),varFList[varId]]))>10) {
-                                    x=round(annRowAll[,varFList[varId]])+1
-                                    x2=as.integer(as.factor(x))
-                                    j=match(annRow$id,annRowAll$id); j1=which(!is.na(j)); j2=j[j1]
-                                    lim=range(x,na.rm=T)
+                                    if (varFList[varId]=="slope") {
+                                        lim=100*(limSl+1)
+                                        x=round(100*(annRowAll[,varFList[varId]]+1))
+                                        x[x<lim[1]]=lim[1]; x[x>lim[2]]=lim[2]
+                                    } else {
+                                        x=round(annRowAll[,varFList[varId]])+1
+                                        x2=as.integer(as.factor(x))
+                                        j=match(annRow$id,annRowAll$id); j1=which(!is.na(j)); j2=j[j1]
+                                        lim=range(x,na.rm=T)
+                                    }
                                     grpUniq=lim[1]:lim[2]
                                     rowColUniq=gray(0:(length(grpUniq)-1)/length(grpUniq))
                                     rowCol[varId,j1]=rowColUniq[x2[j2]]
@@ -320,10 +331,16 @@ for (datType in datList) {
                             colCol=matrix(nrow=length(varList),ncol=nrow(annCol))
                             for (varId in 1:length(varList)) {
                                 if (sum(!duplicated(annColAll[!is.na(annColAll[,varList[varId]]),varList[varId]]))>10) {
-                                    x=round(annColAll[,varList[varId]])+1
+                                    if (varList[varId]=="slope") {
+                                        lim=100*(limSl+1)
+                                        x=round(100*(annColAll[,varList[varId]]+1))
+                                        x[x<lim[1]]=lim[1]; x[x>lim[2]]=lim[2]
+                                    } else {
+                                        x=round(annColAll[,varList[varId]])+1
+                                        lim=range(x,na.rm=T)
+                                    }
                                     x2=as.integer(as.factor(x))
                                     j=match(annCol$id,annColAll$id); j1=which(!is.na(j)); j2=j[j1]
-                                    lim=range(x,na.rm=T)
                                     grpUniq=lim[1]:lim[2]
                                     colColUniq=gray(0:(length(grpUniq)-1)/length(grpUniq))
                                     colCol[varId,j1]=colColUniq[x2[j2]]
@@ -430,13 +447,17 @@ for (datType in datList) {
                                     } else {
                                         pdf(paste("heatmapSampleColorBarLegend_",varListAll[varId],fName2,".pdf",sep=""))
                                     }
-                                    x=round(annColAll[,varListAll[varId]])+1
-                                    lim=range(x,na.rm=T)
-                                    if (varList[varId]==c("mutPerc")) lim=limPerc+1
-                                    #if (length(grep("dist2class",varList[varId]))==1) lim=limDist2classSam
-                                    grpUniq=lim[1]:lim[2]
+                                    if (varListAll[varId]%in%c("slope")) {
+                                        lim=100*limSl
+                                        grpUniq=lim[1]:lim[2]
+                                        lim=limSl
+                                    } else {
+                                        x=round(annColAll[,varListAll[varId]])+1
+                                        lim=range(x,na.rm=T)
+                                        grpUniq=lim[1]:lim[2]
+                                        lim=lim-1
+                                    }
                                     colColUniq=gray(0:(length(grpUniq)-1)/length(grpUniq))
-                                    lim=lim-1
                                     heatmapColorBar(limit=lim,cols=c(colColUniq[c(length(colColUniq),1,median(1:length(colColUniq)))]))
                                 } else {
                                     x=as.character(annColAll[,varListAll[varId]]); x[x==""]=NA

@@ -362,6 +362,7 @@ write.table(paste("qRscript tmp_mmu.R ",x1[!x1%in%x2],sep=""), file="tmp3.txt",c
 #######################################################
 #######################################################
 ## Section 4
+## DE genes
 
 library(limma)
 library(qvalue)
@@ -369,6 +370,15 @@ library(sva)
 source(paste(dirSrc,"functions/TTest.9.1.6.R",sep=""))
 
 fName1=""
+
+varInfo=data.frame(formula=c("group+experimentNo","group","experimentNo"),variable=c("treatExpt","group","experimentNo"),name=c("_treatAndExptNoAdj","_treatAdj","_exptNoAdj"),stringsAsFactors=F)
+adjFlag="_treatAndExptNoAdj"
+
+varInfo=data.frame(formula=c("treatExpt","group","experimentNo"),variable=c("treatExpt","group","experimentNo"),name=c("_treatExptNoAdj","_treatAdj","_exptNoAdj"),stringsAsFactors=F)
+adjFlag="_exptNoAdj"
+adjFlag=""
+adjFlag="_treatAdj"
+adjFlag="_treatExptNoAdj"
 
 grp=as.factor(eset$phen$group)
 getLog2Mean=function(x) {
@@ -395,18 +405,22 @@ contMat=makeContrasts(gammaVsham=grp_-grpSham,hzeVsham=grpHZE-grpSham,hzeVgamma=
 fit2=contrasts.fit(fit, contMat)
 fit2=eBayes(fit2)
 
+phen0=eset$phen
+phen0$treatExpt=paste(phen0$group,phen0$experimentNo)
+
 #grp=as.integer(eset$phen$group!="Sham")
 #grp[which(eset$phen$group=="HZE")]=2
 compList=c("gammaVsham","hzeVsham","hzeVgamma")
+subsetList=""
 
 compList="slope"
 subsetList=c("",paste("_",c("gamma","hze","sham"),sep=""))
 
 colId=2
+tmp=matrix(nrow=nrow(fit2$coef),ncol=length(compList)*length(subsetList),dimnames=list(rownames(fit2$coef),paste(compList,rep(subsetList,each=length(compList)),sep="")))
+fit3=list(coef=tmp,p.value=tmp)
+fit4=list(coef=tmp,p.value=tmp)
 for (subsetFlag in subsetList) {
-    tmp=matrix(nrow=nrow(fit2$coef),ncol=length(compList),dimnames=list(rownames(fit2$coef),compList))
-    fit3=list(coef=tmp,p.value=tmp)
-    fit4=list(coef=tmp,p.value=tmp)
     for (compId in 1:length(compList)) {
         cat("\n\n===================== ",compFlag,covFlag,subsetFlag,"\n",sep=": ")
         compFlag=compList[compId]
@@ -427,49 +441,76 @@ for (subsetFlag in subsetList) {
             varList="slope"; grpUniq=grpName=NULL
         }
         )
-        samId=1:nrow(eset$phen)
+        samId=1:nrow(phen0)
         if (is.null(grpUniq)) {
-            samId=samId[!is.na(eset$phen[samId,varList])]
+            samId=samId[!is.na(phen0[samId,varList])]
         } else {
-            samId=samId[which(eset$phen[samId,varList]%in%grpUniq)]
+            samId=samId[which(phen0[samId,varList]%in%grpUniq)]
         }
         switch(subsetFlag,
             "_gamma"={
-                samId=samId[which(eset$phen$group[samId]%in%c("_"))]
+                samId=samId[which(phen0$group[samId]%in%c("_"))]
             },
             "_hze"={
-                samId=samId[which(eset$phen$group[samId]%in%c("HZE"))]
+                samId=samId[which(phen0$group[samId]%in%c("HZE"))]
             },
             "_sham"={
-                samId=samId[which(eset$phen$group[samId]%in%c("Sham"))]
+                samId=samId[which(phen0$group[samId]%in%c("Sham"))]
             }
         )
-        phen=eset$phen[samId,]
+        phen=phen0[samId,]
         covFlag=""
         if (varList=="slope") {
-            varList2="group"
-            x=table(phen[,varList2])
-            x=x[which(x!=1)]
-            if (length(x)>1) {
-                covFlag="_treatAdj"
+            var2Info=varInfo
+            if (adjFlag%in%c("_treatExptNoAdj","_treatAndExptNoAdj") & sum(!duplicated(phen$group))==1) {
+                adj2Flag="_exptNoAdj"
             } else {
-                varList2="experimentNo"
-                x=table(phen[,varList2])
+                adj2Flag=adjFlag
+            }
+            k=which(var2Info$name==adj2Flag)
+            if (length(k)==1 && k>1) var2Info=var2Info[-(1:(length(k)-1)),]
+            covFlag=""
+            varList2=NULL
+            for (k in 1:nrow(var2Info)) {
+                x=table(phen[,var2Info$variable[k]])
                 x=x[which(x!=1)]
                 if (length(x)>1) {
-                    covFlag="_exptNoAdj"
-                } else {
-                    covFlag=""
-                    varList2=NULL
+                    varList2=strsplit(var2Info$formula[k],"+",fixed=T)[[1]]
+                    covFlag=var2Info$name[k]
+                    break
                 }
             }
-            if (covFlag!="") {
+            if (F) {
+                varList2="group"
                 x=table(phen[,varList2])
-                if (any(x==1)) {
-                    cat("Excluded singular groups ",names(x)[x==1],"\n",sep="")
+                x=x[which(x!=1)]
+                if (adj2Flag!="_treatAdj") x=1
+                if (length(x)>1) {
+                    covFlag="_treatAdj"
+                } else {
+                    varList2="experimentNo"
+                    x=table(phen[,varList2])
                     x=x[which(x!=1)]
-                    samId=samId[which(phen[,varList2]%in%names(x))]
-                    phen=eset$phen[samId,]
+                    if (adj2Flag!="_exptNoAdj") x=1
+                    if (length(x)>1) {
+                        covFlag="_exptNoAdj"
+                    } else {
+                        covFlag=""
+                        varList2=NULL
+                    }
+                }
+            }
+            if (F) {
+                if (covFlag!="") {
+                    for (varThis in varList2) {
+                        x=table(phen[,varThis])
+                        if (any(x==1)) {
+                            cat("\nExcluded singular groups ",names(x)[x==1],"\n",sep="")
+                            x=x[which(x!=1)]
+                            samId=samId[which(phen[,varThis]%in%names(x))]
+                            phen=phen0[samId,]
+                        }
+                    }
                 }
             }
         }
@@ -477,7 +518,7 @@ for (subsetFlag in subsetList) {
         if (covFlag=="") {
             modelThis=paste("~",varList,sep="")
         } else {
-            modelThis=paste("~",varList,"+as.factor(",varList2,")",sep="")
+            modelThis=paste("~",varList,paste("+as.factor(",varList2,")",collapse=""),sep="")
         }
         if (varType=="categorical") {
             modelThis=sub("varList","as.factor(varList)",modelThis)
@@ -486,16 +527,17 @@ for (subsetFlag in subsetList) {
         design=model.matrix(modelThis,data=phen)
         fit=lmFit(eset$expr[clId,samId],design)
         fit=eBayes(fit)
-        fit3$coef[,compId]=fit$coef[,colId]
-        fit3$p.value[,compId]=fit$p.value[,colId]
+        fit3$coef[,paste(compFlag,subsetFlag,sep="")]=fit$coef[,colId]
+        fit3$p.value[,paste(compFlag,subsetFlag,sep="")]=fit$p.value[,colId]
         out=data.frame(probesetid=rownames(fit$coef),coef=fit$coef[,colId],t=fit$t[,colId],pv=fit$p.value[,colId])
         write.table(out,file=paste("stat_",compFlag,covFlag,subsetFlag,fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
         
         mod=design
-        mod0=model.matrix(as.formula(paste("~as.factor(",varList2,")",sep="")), data=phen)
+        mod0=model.matrix(as.formula(paste("~",paste("as.factor(",varList2,")",collapse="+"),sep="")), data=phen)
         svObj=sva(eset$expr[clId,samId],mod,mod0)
+        nm=NULL
         if (is.matrix(svObj$sv)) {
-            nm=c(colnames(mod),paste("sv",1:ncol(dat),sep=""))
+            nm=c(colnames(mod),paste("sv",1:ncol(svObj$sv),sep=""))
         } else if (is.numeric(svObj$sv)) {
             if (length(svObj$sv)>1) {
                 nm=c(colnames(mod),"sv1")
@@ -509,16 +551,17 @@ for (subsetFlag in subsetList) {
             colnames(design)=nm
             fit=lmFit(eset$expr[clId,samId],design)
             fit=eBayes(fit)
-            fit4$coef[,compId]=fit$coef[,colId]
-            fit4$p.value[,compId]=fit$p.value[,colId]
+            fit4$coef[,paste(compFlag,subsetFlag,sep="")]=fit$coef[,colId]
+            fit4$p.value[,paste(compFlag,subsetFlag,sep="")]=fit$p.value[,colId]
             out=data.frame(probesetid=rownames(fit$coef),coef=fit$coef[,colId],t=fit$t[,colId],pv=fit$p.value[,colId])
             write.table(out,file=paste("stat_",compFlag,covFlag,subsetFlag,"_sva",fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
         } else {
-            cat("Could not run SVA\n",sep="")
+            cat("Could not run SVA !!!\n",sep="")
         }
     }
 }
 
+## ----------------------------------------------
 fitThis=fit3
 fitThis=fit2
 png("tmp.png")
@@ -607,6 +650,10 @@ for (i2 in ii) {
 legend(3,lim[2]-.1,"mean",col="green",lty="solid")
 dev.off()
 
+png(paste("densityPlot_slope.png"))
+plot(density(phen0$slope,na.rm=T),main="slope")
+dev.off()
+
 ## ----------------------------------------------
 fName1="_sva_moGene2.0"
 fName1="_moGene2.0"
@@ -619,10 +666,20 @@ pThres2=0.05
 onePlotFlag=F
 onePlotFlag=T
 
+cexThis=.8
+cexThis=1.2
+
 compFlag3=""
 
 compList1=c("gammaVsham","hzeVsham","hzeVgamma")
 compList1=c("gammaVsham","hzeVsham")
+subsetList=""
+
+compList1="slope"
+subsetList=c("",paste("_",c("gamma","hze","sham"),sep=""))
+
+fName2=ifelse(length(compList1)==1,paste("_",compList1,sep=""),subsetList)
+if (fName2=="_") fName2=""
 
 switch(fName1,
     "_moGene2.0"={
@@ -633,117 +690,141 @@ switch(fName1,
     }
 )
 
-out=NULL
+out1=NULL
 if (compFlag3=="") {
     if (onePlotFlag) {
         if (compFlag3=="") {
-            #png(paste("dePlots",fName1,".png",sep=""),width=6*240,height=3*240)
-            png(paste("dePlots",fName1,".png",sep=""),width=length(compList1)*2*240,height=3*240)
-            par(mfcol=c(2,length(compList1)))
+            #png(paste("dePlots",fName2,fName1,".png",sep=""),width=6*240,height=3*240)
+            png(paste("dePlots",fName2,fName1,".png",sep=""),width=length(compList1)*length(subsetList)*2*240,height=3*240)
+            par(mfcol=c(2,length(compList1)*length(subsetList)))
         } else {
-            png(paste("dePlots",fName1,".png",sep=""),width=6*240,height=2*240)
+            png(paste("dePlots",fName2,fName1,".png",sep=""),width=6*240,height=2*240)
             par(mfcol=c(2,6))
         }
     }
 }
-for (compFlag in compList1) {
-    if (compFlag3=="") compList=compFlag
-    if (compFlag3!="") {
-        if (onePlotFlag) {
-            if (compFlag3=="") {
-                png(paste("dePlots",compFlag3,"_",compFlag,fName1,".png",sep=""),width=4*240,height=2*240)
-                par(mfcol=c(2,4))
-            } else {
-                png(paste("dePlots",compFlag3,"_",compFlag,fName1,".png",sep=""),width=length(compList)*240,height=2*240)
-                par(mfcol=c(2,length(compList)))
+for (subsetFlag in subsetList) {
+    for (compFlag in compList1) {
+        if (compFlag3=="") compList=compFlag
+        if (compFlag3!="") {
+            if (onePlotFlag) {
+                if (compFlag3=="") {
+                    png(paste("dePlots",compFlag3,"_",compFlag,subsetFlag,fName1,".png",sep=""),width=4*240,height=2*240)
+                    par(mfcol=c(2,4))
+                } else {
+                    png(paste("dePlots",compFlag3,"_",compFlag,subsetFlag,fName1,".png",sep=""),width=length(compList)*240,height=2*240)
+                    par(mfcol=c(2,length(compList)))
+                }
             }
         }
-    }
-    for (compThis in compList) {
-        compFlag2=compFlag
-        colGeneId="probesetid"
-        stat_1=data.frame(probesetid=rownames(fitThis$coef),coef=fitThis$coef[,compFlag],pv=fitThis$p.value[,compFlag],qv=rep(NA,nrow(fitThis$coef)))
-        i=which(!is.na(stat_1$pv))
-        stat_1$qv[i]=qvalue(stat_1$pv[i])$qvalues
-        ann_1=eset$ann[clId,]
-        switch(compFlag,
-        "gammaVsham"={
-            compName="Gamma vs. sham"
-        },
-        "hzeVsham"={
-            compName="HZE vs. sham"
-        },
-        "hzeVgamma"={
-            compName="HZE vs. gamma"
-        }
+        subsetName="All samples: "
+        switch(subsetFlag,
+            "_gamma"={
+                subsetName="Gamma: "
+            },
+            "_hze"={
+                subsetName="HZE: "
+            },
+            "_sham"={
+                subsetName="Sham: "
+            }
         )
-        if (compFlag3!="") compName=paste(compThis,", ",compName,sep="")
-        i1=match(stat_1[,colGeneId],ann_1[,colGeneId])
-        ann_1=ann_1[i1,]
-        cat("\n\n",compName,"\n",sep="")
-        x=table(stat_1$coef>0,stat_1[,colIdPV]<pThres)
-        rownames(x)=c("Down","Up")[match(rownames(x),c("FALSE","TRUE"))]
-        colnames(x)=paste(colNamePV,c(">=","<"),pThres,sep="")[match(colnames(x),c("FALSE","TRUE"))]
-        print(x)
-        
-        cexMain=cexLab=1.5
-        cexMain=cexLab=2.5
-        cexMain=2.5; cexLab=1.5
-        
-        if (!onePlotFlag) png(paste("histogram_",compFlag,".png",sep=""))
-        hist(stat_1$pv,xlab="P-value",main=compName,pch=19,cex.main=cexMain,cex.lab=cexLab,cex.axis=1.5)
-        if (!onePlotFlag) dev.off()
-        
-        if (!onePlotFlag) png(paste("volcanoPlot_",compFlag,"_",tolower(colNamePV),pThres,".png",sep=""))
-        i=which(stat_1[,colIdPV]<pThres)
-        plot(stat_1$coef,-log10(stat_1$pv),xlab="Log2 fold change",ylab="-Log10(p-value)",main=paste(compName,"\nNo. with ",tolower(colNamePV)," < ",pThres,": ",length(i),sep=""),pch=19,cex=.8,cex.main=cexMain,cex.lab=cexLab,cex.axis=1.5)
-        if (length(i)!=0) points(stat_1$coef[i],-log10(stat_1$pv[i]),col="red",pch=19,cex=.8)
-        if (!onePlotFlag) dev.off()
-
-        out2=stat_1[match(ann_1[,colGeneId],stat_1[,colGeneId]),c("coef","pv","qv")]
-        chr=sapply(ann_1$seqname,function(x) {
-            y=strsplit(x,"_")[[1]]
-            chr=sub("chr","",y[1])
-            chr1=chr
-            if (length(chr)!=1) print(x)
-            switch(chr1,
-            "X"={chr="23"},
-            "Y"={chr="24"},
-            "M"={chr="99"},
-            "Un"={chr="100"}
+        for (compThis in compList) {
+            compFlag2=compFlag
+            colGeneId="probesetid"
+            stat_1=data.frame(probesetid=rownames(fitThis$coef),coef=fitThis$coef[,paste(compFlag,subsetFlag,sep="")],pv=fitThis$p.value[,paste(compFlag,subsetFlag,sep="")],qv=rep(NA,nrow(fitThis$coef)))
+            i=which(!is.na(stat_1$pv))
+            if (length(i)==0) next
+            stat_1$qv[i]=qvalue(stat_1$pv[i])$qvalues
+            ann_1=eset$ann[clId,]
+            switch(compFlag,
+                "gammaVsham"={
+                    compName="Gamma vs. sham"
+                },
+                "hzeVsham"={
+                    compName="HZE vs. sham"
+                },
+                "hzeVgamma"={
+                    compName="HZE vs. gamma"
+                },
+                "slope"={
+                    compName="Slope"
+                }
             )
-            chr=as.integer(chr)
-            if (length(y)!=1) chr=1000+chr
-            chr
-        },USE.NAMES=F)
-        i=1:nrow(out2)
-        i=order(chr,ann_1$start)
-        i=order(out2$pv)
-        out2=out2[i,]
-        names(out2)=paste(names(out2),"_",compFlag2,sep="")
-        names(out2)=sub("coef_","log2FC",names(out2))
-        out2=cbind(ann_1[i,which(!names(ann_1)%in%colGeneId)],out2)
-        write.table(out2, file=paste("stat_",compFlag2,fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
+            if (compFlag3!="") compName=paste(compThis,", ",compName,sep="")
+            i1=match(stat_1[,colGeneId],ann_1[,colGeneId])
+            ann_1=ann_1[i1,]
+            cat("\n\n",subsetName,compName,"\n",sep="")
+            x=table(stat_1$coef>0,stat_1[,colIdPV]<pThres)
+            rownames(x)=c("Down","Up")[match(rownames(x),c("FALSE","TRUE"))]
+            colnames(x)=paste(colNamePV,c(">=","<"),pThres,sep="")[match(colnames(x),c("FALSE","TRUE"))]
+            print(x)
+            
+            cexMain=cexLab=1.5
+            cexMain=cexLab=2.5
+            cexMain=2.5; cexLab=1.5
+            
+            if (!onePlotFlag) png(paste("histogram_",compFlag,subsetFlag,".png",sep=""))
+            hist(stat_1$pv,xlab="P-value",main=paste(subsetName,compName,sep=""),pch=19,cex.main=cexMain,cex.lab=cexLab,cex.axis=1.5)
+            if (!onePlotFlag) dev.off()
+            
+            if (!onePlotFlag) png(paste("volcanoPlot_",compFlag,subsetFlag,"_",tolower(colNamePV),pThres,".png",sep=""))
+            i=which(stat_1[,colIdPV]<pThres)
+            plot(stat_1$coef,-log10(stat_1$pv),main=paste(subsetName,compName,"\nNo. with ",tolower(colNamePV)," < ",pThres,": ",length(i),sep=""),xlab="Log2 fold change",ylab="-Log10(p-value)",pch=19,cex=.8,cex.main=cexMain,cex.lab=cexLab,cex.axis=1.5)
+            if (length(i)!=0) points(stat_1$coef[i],-log10(stat_1$pv[i]),col="red",pch=19,cex=cexThis)
+            if (!onePlotFlag) dev.off()
 
-        if (F) {
             out2=stat_1[match(ann_1[,colGeneId],stat_1[,colGeneId]),c("coef","pv","qv")]
-            i=order(out2$pv); i=i[which(out2$pv[i]<pThres2)]
+            rownames(out2)=ann_1[,colGeneId]
+            chr=sapply(ann_1$seqname,function(x) {
+                y=strsplit(x,"_")[[1]]
+                chr=sub("chr","",y[1])
+                chr1=chr
+                if (length(chr)!=1) print(x)
+                switch(chr1,
+                "X"={chr="23"},
+                "Y"={chr="24"},
+                "M"={chr="99"},
+                "Un"={chr="100"}
+                )
+                chr=as.integer(chr)
+                if (length(y)!=1) chr=1000+chr
+                chr
+            },USE.NAMES=F)
+            i=1:nrow(out2)
+            i=order(chr,ann_1$start)
+            i=order(out2$pv)
             out2=out2[i,]
-            names(out2)=paste(names(out2),"_",compFlag2,sep="")
+            names(out2)=paste(names(out2),"_",compFlag2,subsetFlag,sep="")
+            names(out2)=sub("coef_","log2FC_",names(out2))
+            if (is.null(out1)) {
+                out1=ann_1
+            }
+            out1=cbind(out1,out2[match(out1[,colGeneId],rownames(out2)),])
             out2=cbind(ann_1[i,which(!names(ann_1)%in%colGeneId)],out2)
-            write.table(out2, file=paste("stat_",compFlag2,"_pv",pThres2,fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
-        }
+            #write.table(out2, file=paste("stat_",compFlag2,fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
 
-        if (F) {
-            write.table(unique(ann_1$geneId), file=paste("ensGeneId_",compFlag,".txt",sep=""),col.names=F,row.names=F, sep="\t",quote=F)
-            i=which(stat_1$pv<pThres)
-            if (length(i)!=0) write.table(unique(ann_1$geneId[i]), file=paste("ensGeneId_pv",pThres,"_",compFlag,".txt",sep=""),col.names=F,row.names=F, sep="\t",quote=F)
-            i=order(stat_1$pv)[1:200]
-            write.table(unique(ann_1$geneId[i]), file=paste("ensGeneId_top200_",compFlag,".txt",sep=""),col.names=F,row.names=F, sep="\t",quote=F)
+            if (F) {
+                out2=stat_1[match(ann_1[,colGeneId],stat_1[,colGeneId]),c("coef","pv","qv")]
+                i=order(out2$pv); i=i[which(out2$pv[i]<pThres2)]
+                out2=out2[i,]
+                names(out2)=paste(names(out2),"_",compFlag2,sep="")
+                out2=cbind(ann_1[i,which(!names(ann_1)%in%colGeneId)],out2)
+                write.table(out2, file=paste("stat_",compFlag2,"_pv",pThres2,fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
+            }
+
+            if (F) {
+                write.table(unique(ann_1$geneId), file=paste("ensGeneId_",compFlag,subsetFlag,".txt",sep=""),col.names=F,row.names=F, sep="\t",quote=F)
+                i=which(stat_1$pv<pThres)
+                if (length(i)!=0) write.table(unique(ann_1$geneId[i]), file=paste("ensGeneId_pv",pThres,"_",compFlag,subsetFlag,".txt",sep=""),col.names=F,row.names=F, sep="\t",quote=F)
+                i=order(stat_1$pv)[1:200]
+                write.table(unique(ann_1$geneId[i]), file=paste("ensGeneId_top200_",compFlag,subsetFlag,".txt",sep=""),col.names=F,row.names=F, sep="\t",quote=F)
+            }
         }
+        if (onePlotFlag & compFlag3!="") dev.off()
     }
-    if (onePlotFlag & compFlag3!="") dev.off()
 }
+write.table(out1, file=paste("stat",fName2,fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
 if (onePlotFlag & compFlag3=="") dev.off()
 
 "
@@ -767,6 +848,17 @@ QV>=0.05
 Down   118942
 Up     117504
 "
+
+## Check distribution of top genes
+png(paste("scatterPlot_topGenes",fName2,fName1,"_%1d.png",sep=""))
+varList="slope"
+samId=1:nrow(phen0)
+samId=samId[!is.na(phen0[samId,varList])]
+for (i in which(stat_1[,colIdPV]<pThres)) {
+    plot(phen0$slope[samId],eset$expr[clId,samId][i,],main=paste(ann_1$probesetid[i]," ",ann_1$geneSym[i],": pv ",signif(stat_1$pv[i],2),sep=""),xlab=varList,ylab="log2 expression")
+}
+dev.off()
+
 
 ## ----------------------------------------------
 
@@ -806,4 +898,16 @@ for (k1 in colId) {
 # None of the surrogate variables are associated with phenotypic variables
 pvMat
 
+##############################################
+## NOT USED
+
+chr=sub("chr","",ann_1$seqname)
+chr[which(chr=="X")]="22"
+chr[which(chr=="Y")]="23"
+chr=as.integer(chr)
+x=paste(chr*10^9+ann_1$start)
+x=paste(chr*10^9+ann_1$start)
+summary(order(x))
+
+##############################################
 ##############################################

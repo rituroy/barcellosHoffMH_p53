@@ -3,7 +3,8 @@
 library(marray)
 source(paste(dirSrc,"functions/heatmap.5.6.R",sep=""))
 #source(paste(dirSrc,"functions/heatmap.5.7.R",sep=""))
-source(paste(dirSrc,"functions/heatmapAcgh.7.1.R",sep=""))
+#source(paste(dirSrc,"functions/heatmapAcgh.7.1.R",sep=""))
+source(paste(dirSrc,"functions/heatmapAcgh.7.3.R",sep=""))
 
 load("results/clId.RData")
 
@@ -23,6 +24,8 @@ numPr=2000
 pThres=10^-8
 pThres=10^-6
 pThres=0.05
+
+limSl=c(0,0.5)
 
 compList=paste("_rnd",numPr,sep="")
 compList=paste("_topVar",numPr,sep="")
@@ -190,6 +193,7 @@ for (compFlag in compList) {
                 }
                 
                 varList=c("treatment","group","experimentNo")
+                varList=c("slope","treatment","group","experimentNo")
                 varName=paste(varList," ",sep="")
                 k=which(varList%in%names(annCol))
                 varListAll=varList
@@ -232,15 +236,21 @@ for (compFlag in compList) {
                 samCol=NULL
                 samCol=matrix(nrow=length(varList),ncol=nrow(annCol))
                 for (varId in 1:length(varList)) {
-                    if (varList[varId]%in%c("lib.size")) {
-                        j=match(annCol$id,annColAll$id)
-                        x=round(annColAll[,varList[varId]])
-                        lim=range(x,na.rm=T)
-                        #lim=quantile(x,probs=c(.1,.9),na.rm=T)
+                    if (varList[varId]%in%c("slope")) {
+                        j1=which(!is.na(annCol[,varList[varId]]))
+                        j=match(annCol$id[j1],annColAll$id); j1=j1[!is.na(j)]; j2=j[!is.na(j)]
+                        if (varList[varId]%in%c("slope")) {
+                            x=round(100*annColAll[,varList[varId]])
+                            lim=100*limSl
+                        } else {
+                            x=round(annColAll[,varList[varId]])
+                            lim=range(x,na.rm=T)
+                            #lim=quantile(x,probs=c(.1,.9),na.rm=T)
+                        }
                         x[x<lim[1]]=lim[1]; x[x>lim[2]]=lim[2]
                         grpUniq=lim[1]:lim[2]
                         samColUniq=gray(0:(length(grpUniq)-1)/length(grpUniq))
-                        samCol[varId,]=samColUniq[x[j]]
+                        samCol[varId,j1]=samColUniq[x[j2]]
                     } else {
                         if (varList[varId]%in%c("time")) {
                             x=annColAll[,varList[varId]]
@@ -359,7 +369,7 @@ for (compFlag in compList) {
                         clustId[which(clustId==clustId[k1[k]])]=paste("cluster",k,sep="")
                     }
                     
-                    tbl=cbind(annCol[clustC$order,which(!names(annCol)%in%c("order"))],clustId,order=1:nrow(annCol))
+                    tbl=cbind(annCol[clustC$order,which(!names(annCol)%in%c("order","slopeCat"))],clustId,order=1:nrow(annCol))
                     write.table(tbl, paste("clusterInfoSample",fNameOut,".txt",sep=""), sep="\t", col.names=T, row.names=F, quote=F)
                 }
             }
@@ -368,19 +378,30 @@ for (compFlag in compList) {
 }
 if (!is.null(samCol)) {
     for (varId in 1:length(varListAll)) {
-        if (outFormat=="png") {
-            png(paste("heatmapSampleColorBarLegend_",varListAll[varId],".png",sep=""))
-        } else {
-            pdf(paste("heatmapSampleColorBarLegend_",varListAll[varId],".pdf",sep=""))
-        }
-        if (varListAll[varId]%in%c("age","wbc")) {
-            x=round(annColAll[,varListAll[varId]])
-            lim=range(x,na.rm=T)
-            #lim=quantile(x,probs=c(.1,.9),na.rm=T)
-            grpUniq=lim[1]:lim[2]
+        if (varListAll[varId]%in%c("slope")) {
+            if (outFormat=="png") {
+                png(paste("heatmapSampleColorBarLegend_",varListAll[varId],".png",sep=""),width=480,height=140)
+            } else {
+                pdf(paste("heatmapSampleColorBarLegend_",varListAll[varId],".pdf",sep=""))
+            }
+            if (varListAll[varId]%in%c("slope")) {
+                lim=100*limSl
+                grpUniq=lim[1]:lim[2]
+                lim=limSl
+            } else {
+                x=round(annColAll[,varListAll[varId]])
+                lim=range(x,na.rm=T)
+                #lim=quantile(x,probs=c(.1,.9),na.rm=T)
+                grpUniq=lim[1]:lim[2]
+            }
             samColUniq=gray(0:(length(grpUniq)-1)/length(grpUniq))
             heatmapColorBar(limit=lim,cols=c(samColUniq[c(length(samColUniq),1)],median(samColUniq)))
         } else {
+            if (outFormat=="png") {
+                png(paste("heatmapSampleColorBarLegend_",varListAll[varId],".png",sep=""))
+            } else {
+                pdf(paste("heatmapSampleColorBarLegend_",varListAll[varId],".pdf",sep=""))
+            }
             if (varList[varId]%in%c("time")) {
                 x=annColAll[,varListAll[varId]]
             } else {
