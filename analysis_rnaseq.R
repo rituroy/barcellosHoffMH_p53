@@ -113,12 +113,14 @@ datadir="results/rnaSeq/slopeCat/"
 datadir="results/rnaSeq/slope/"
 datadir="results/rnaSeq/deGene/treatment/"
 datadir="results/rnaSeq/treatAndExptNoAdj/slope/"
+datadir="results/rnaSeq/deGene/slopeCat/"
 
 colIdPV="pv"; colNamePV="PV"; pThres=10^-6
 colIdPV="qv"; colNamePV="QV"; pThres=0.05
 
-onePlotFlag=F
-onePlotFlag=T
+numPlotFlag="single"
+numPlotFlag="subset"
+numPlotFlag="all"
 
 minCntFlag=c(10)
 compFlag3=""
@@ -173,7 +175,6 @@ compList0=paste("_",c("capeGamma"),"VsGamma",sep=""); subsetList="_A1402"
 minCntFlag=c(0,1,2,5,10,20,50)
 minCntFlag=c(10)
 minCntFlag=c(1)
-
 compFlag3="_voom_sva"
 compFlag3="_voom"
 compFlag3="_sva"
@@ -184,6 +185,21 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
 #subsetList=""
 
 ## --------------
+minCntFlag=c(0,1,2,5,10,20,50)
+minCntFlag=c(10)
+minCntFlag=c(1)
+compFlag3=""
+compFlag3="_voom_sva"
+compFlag3="_sva"
+compFlag3="_voom"
+
+compThis0="wilcox"
+
+varType="categorical"
+compList0="_fastVsSlow"
+subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","sham"),sep=""))
+
+## --------------
 
 ## --------------
 #for (minCntFlag in c(0,1,2,5,10,20,50)) {
@@ -192,13 +208,17 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
     fName2=ifelse(length(compList0)==1,compList0,subsetList)
     if (fName2=="_") fName2=""
     fName2=paste(fName2,compFlag3,"_minCnt",minCntFlag,fName1,sep="")
-    fName2=fName1
+    #fName2=fName1
     
     if (F) {
-        if (onePlotFlag & plotFlag=="dePlots") {
+        if (numPlotFlag=="all" & plotFlag=="dePlots") {
             png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=length(compList)*240,height=2*240)
             par(mfcol=c(2,length(compList)))
         }
+    }
+    if (numPlotFlag=="subset" & plotFlag=="dePlots") {
+        png(paste(plotFlag,compFlag3,"_minCnt",minCntFlag,fName1,".png",sep=""),width=length(subsetList)*240,height=2*240)
+        par(mfcol=c(2,length(subsetList)))
     }
     for (subsetFlag in subsetList) {
         for (compFlag0 in compList0) {
@@ -211,6 +231,12 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
                 }
             }
             if (!is.null(compThis0)) {
+                x=dir(datadir,pattern=paste("stat",compFlag0,sep=""))
+                x=x[grep(paste(subsetFlag,fName1,sep=""),x)]
+                x=x[grep("wilcox",x)]
+                if (length(x)==0) {
+                    next
+                }
                 statW=read.table(paste(datadir,"stat",compFlag0,subsetFlag,fName1,"_",compThis0,".txt",sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T)
                 names(statW)=c("geneId","log2FC","pv")
                 statW$qv=NA
@@ -222,7 +248,7 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
             
             out=NULL
             if (compFlag3=="") {
-                if (onePlotFlag) {
+                if (numPlotFlag=="all") {
                     if (compFlag3=="") {
                         if (plotFlag=="plotAveLogCPMvsVoomWilcoxPV") {
                             png(paste(plotFlag,subsetFlag,fName2,".png",sep=""),width=3*240,height=2*240)
@@ -251,7 +277,7 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
                 if (compFlag3=="_voom_sva") compList=paste("voom",c("","_sva"),"_minCnt",minCntFlag,sep="")
                 if (compFlag3=="_sva") compList=paste("voom_sva_minCnt",minCntFlag,sep="")
                 if (compFlag3!="") {
-                    if (onePlotFlag) {
+                    if (numPlotFlag=="all") {
                         if (compFlag3=="") {
                             if (plotFlag=="plotAveLogCPMvsVoomWilcoxPV") {
                                 png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=3*240,height=2*240)
@@ -283,6 +309,7 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
                     #stat_1=read.table(paste(datadir,"stat",compFlag1,subsetFlag,fName1,"_",compThis,".txt",sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T)
                     x=dir(datadir,pattern=paste("stat",compFlag1,sep=""))
                     x=x[grep(paste(subsetFlag,fName1,"_",compThis,".txt",sep=""),x)]
+                    #x=x[grep(paste(subsetFlag,fName1,compThis,".txt",sep=""),x)]
                     if (length(x)>1) {
                         x=x[grep(paste("_",c(sub("_","",adjFlag),"exptNoAdj","investAdj","treatAdj"),subsetFlag,fName1,sep="",collapse="|"),x)]
                     }
@@ -387,6 +414,7 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
                         grpName=c("slow","fast")
                         grpUniq=c(0,1)
                         varList="slopeCat2"
+                        varList="slopeCat3"
                     }
                     )
                     if (is.null(grpUniq)) {
@@ -491,15 +519,15 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
                             dev.off()
                         }
                         
-                        if (!onePlotFlag) png(paste("histogram_",compFlag1,subsetFlag,".png",sep=""))
+                        if (numPlotFlag=="single") png(paste("histogram_",compFlag1,subsetFlag,".png",sep=""))
                         hist(stat_1$pv,xlab="P-value",pch=19,cex.axis=1.5,cex.lab=1.5,main=header)
-                        if (!onePlotFlag) dev.off()
+                        if (numPlotFlag=="single") dev.off()
                         
-                        if (!onePlotFlag) png(paste("volcanoPlot_",compFlag1,subsetFlag,"_",tolower(colNamePV),pThres,".png",sep=""))
+                        if (numPlotFlag=="single") png(paste("volcanoPlot_",compFlag1,subsetFlag,"_",tolower(colNamePV),pThres,".png",sep=""))
                         i=which(stat_1[,colIdPV]<pThres)
                         plot(stat_1$log2FC,-log10(stat_1$pv),xlab="Log2 fold change",ylab="-Log10(p-value)",main=paste(header,"\nN=",nrow(stat_1),", no. with ",tolower(colNamePV),"<",pThres,": ",length(i),sep=""),pch=19,cex=.1,cex.axis=1.5,cex.lab=1.5)
                         if (length(i)!=0) points(stat_1$log2FC[i],-log10(stat_1$pv[i]),col="red",pch=19,cex=.2)
-                        if (!onePlotFlag) dev.off()
+                        if (numPlotFlag=="single") dev.off()
                         
                         #out2=stat_1[match(ann_1[,colGeneId],stat_1[,colGeneId]),c("foldChange","log2FC","logCPM","pv","FDR")]
                         out2=stat_1[match(ann_1[,colGeneId],stat_1[,colGeneId]),c("log2FC","pv","qv")]
@@ -524,11 +552,13 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
                         }
                     }
                 }
-                if (onePlotFlag & compFlag3!="" & plotFlag!="scatterPlot_topGenes") dev.off()
+                if (numPlotFlag=="all" & compFlag3!="" & plotFlag!="scatterPlot_topGenes") dev.off()
             }
-            if (onePlotFlag & compFlag3=="" & plotFlag!="scatterPlot_topGenes") dev.off()
+            if (numPlotFlag=="all" & compFlag3=="" & plotFlag!="scatterPlot_topGenes") dev.off()
         }
     }
+    if (numPlotFlag=="subset" & plotFlag=="dePlots")  dev.off()
+        
 #}
 
 ## Check log2 fold change direction
@@ -917,3 +947,6 @@ dev.off()
 
 ###########################################################
 ###########################################################
+
+datadir="results/rnaSeq/deGene/slopeCat/"
+stat1=read.table(paste(datadir,x,sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T)

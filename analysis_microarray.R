@@ -363,6 +363,7 @@ write.table(paste("qRscript tmp_mmu.R ",x1[!x1%in%x2],sep=""), file="tmp3.txt",c
 #######################################################
 ## Section 4
 ## DE genes
+## Run section 2 first
 
 library(limma)
 library(qvalue)
@@ -379,6 +380,9 @@ adjFlag="_exptNoAdj"
 adjFlag=""
 adjFlag="_treatAdj"
 adjFlag="_treatExptNoAdj"
+
+varInfo=data.frame(formula=c("group"),variable=c("group"),name=c("_treatAdj"),stringsAsFactors=F)
+adjFlag=""
 
 grp=as.factor(eset$phen$group)
 getLog2Mean=function(x) {
@@ -406,14 +410,20 @@ fit2=contrasts.fit(fit, contMat)
 fit2=eBayes(fit2)
 
 phen0=eset$phen
+phen0$group[which(phen0$group=="Sham")]="0Sham"
 phen0$treatExpt=paste(phen0$group,phen0$experimentNo)
+phen0$slopeCat3=as.integer(phen0$slopeCat=="fast")
+phen0$slopeCat3[!phen0$slopeCat%in%c("slow","fast")]=NA
 
-#grp=as.integer(eset$phen$group!="Sham")
+#grp=as.integer(eset$phen$group!="0Sham")
 #grp[which(eset$phen$group=="HZE")]=2
 compList=c("gammaVsham","hzeVsham","hzeVgamma")
 subsetList=""
 
 compList="slope"
+subsetList=c("",paste("_",c("gamma","hze","sham"),sep=""))
+
+compList="fastVsSlow"
 subsetList=c("",paste("_",c("gamma","hze","sham"),sep=""))
 
 colId=2
@@ -422,16 +432,15 @@ fit3=list(coef=tmp,p.value=tmp)
 fit4=list(coef=tmp,p.value=tmp)
 for (subsetFlag in subsetList) {
     for (compId in 1:length(compList)) {
-        cat("\n\n===================== ",compFlag,covFlag,subsetFlag,"\n",sep=": ")
         compFlag=compList[compId]
         varList2="experimentNo"
         varType="categorical"
         switch(compFlag,
         "gammaVsham"={
-            varList="group"; grpUniq=c("Sham","_"); grpName=c("sham","gamma")
+            varList="group"; grpUniq=c("0Sham","_"); grpName=c("sham","gamma")
         },
         "hzeVsham"={
-            varList="group"; grpUniq=c("Sham","HZE"); grpName=c("sham","hze")
+            varList="group"; grpUniq=c("0Sham","HZE"); grpName=c("sham","hze")
         },
         "hzeVgamma"={
             varList="group"; grpUniq=c("_","HZE"); grpName=c("gamma","hze")
@@ -439,6 +448,9 @@ for (subsetFlag in subsetList) {
         "slope"={
             varType="continuous"
             varList="slope"; grpUniq=grpName=NULL
+        },
+        "fastVsSlow"={
+            varList="slopeCat3"; grpUniq=c(0,1); grpName=c("slow","fast")
         }
         )
         samId=1:nrow(phen0)
@@ -455,7 +467,7 @@ for (subsetFlag in subsetList) {
                 samId=samId[which(phen0$group[samId]%in%c("HZE"))]
             },
             "_sham"={
-                samId=samId[which(phen0$group[samId]%in%c("Sham"))]
+                samId=samId[which(phen0$group[samId]%in%c("0Sham"))]
             }
         )
         phen=phen0[samId,]
@@ -513,7 +525,28 @@ for (subsetFlag in subsetList) {
                     }
                 }
             }
+        } else {
+            var2Info=varInfo
+            if (adjFlag%in%c("_treatExptNoAdj","_treatAndExptNoAdj") & sum(!duplicated(phen$group))==1) {
+                adj2Flag="_exptNoAdj"
+            } else {
+                adj2Flag=adjFlag
+            }
+            k=which(var2Info$name==adj2Flag)
+            if (length(k)==1 && k>1) var2Info=var2Info[-(1:(length(k)-1)),]
+            covFlag=""
+            varList2=NULL
+            for (k in 1:nrow(var2Info)) {
+                x=table(phen[,varList],phen[,var2Info$variable[k]])
+                y=x!=0
+                if (nrow(x)>1 && ncol(x)>1 && any(y[1,]==y[2,])) {
+                    varList2=strsplit(var2Info$formula[k],"+",fixed=T)[[1]]
+                    covFlag=var2Info$name[k]
+                    break
+                }
+            }
         }
+        cat("\n\n===================== ",compFlag,covFlag,subsetFlag,"\n",sep=": ")
         cat("No. of samples: ",length(samId),"\n",sep="")
         if (covFlag=="") {
             modelThis=paste("~",varList,sep="")
@@ -533,16 +566,24 @@ for (subsetFlag in subsetList) {
         write.table(out,file=paste("stat_",compFlag,covFlag,subsetFlag,fName1,".txt",sep=""),col.names=T,row.names=F, sep="\t",quote=F)
         
         mod=design
-        mod0=model.matrix(as.formula(paste("~",paste("as.factor(",varList2,")",collapse="+"),sep="")), data=phen)
-        svObj=sva(eset$expr[clId,samId],mod,mod0)
+        if (covFlag=="") {
+            mod0=matrix(rep(1,nrow(phen)),ncol=1); colnames(mod0)="(Intercept)"
+        } else {
+            mod0=model.matrix(as.formula(paste("~",paste("as.factor(",varList2,")",collapse="+"),sep="")), data=phen)
+        }
+        #cat(colnames(mod),"\n")
+        #cat(colnames(mod0),"\n")
+        svObj=try(sva(eset$expr[clId,samId],mod,mod0))
         nm=NULL
-        if (is.matrix(svObj$sv)) {
-            nm=c(colnames(mod),paste("sv",1:ncol(svObj$sv),sep=""))
-        } else if (is.numeric(svObj$sv)) {
-            if (length(svObj$sv)>1) {
-                nm=c(colnames(mod),"sv1")
-            } else {
-                nm=NULL
+        if (class(svObj)!="try-error") {
+            if (is.matrix(svObj$sv)) {
+                nm=c(colnames(mod),paste("sv",1:ncol(svObj$sv),sep=""))
+            } else if (is.numeric(svObj$sv)) {
+                if (length(svObj$sv)>1) {
+                    nm=c(colnames(mod),"sv1")
+                } else {
+                    nm=NULL
+                }
             }
         }
         if (!is.null(nm)) {
@@ -655,8 +696,8 @@ plot(density(phen0$slope,na.rm=T),main="slope")
 dev.off()
 
 ## ----------------------------------------------
-fName1="_sva_moGene2.0"
 fName1="_moGene2.0"
+fName1="_sva_moGene2.0"
 
 colIdPV="pv"; colNamePV="PV"; pThres=10^-6
 colIdPV="qv"; colNamePV="QV"; pThres=0.05
@@ -676,6 +717,9 @@ compList1=c("gammaVsham","hzeVsham")
 subsetList=""
 
 compList1="slope"
+subsetList=c("",paste("_",c("gamma","hze","sham"),sep=""))
+
+compList1="fastVsSlow"
 subsetList=c("",paste("_",c("gamma","hze","sham"),sep=""))
 
 fName2=ifelse(length(compList1)==1,paste("_",compList1,sep=""),subsetList)
@@ -749,6 +793,9 @@ for (subsetFlag in subsetList) {
                 },
                 "slope"={
                     compName="Slope"
+                },
+                "fastVsSlow"={
+                    compName="Fast vs. slow"
                 }
             )
             if (compFlag3!="") compName=paste(compThis,", ",compName,sep="")
