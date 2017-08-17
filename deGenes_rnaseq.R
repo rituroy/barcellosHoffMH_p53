@@ -346,9 +346,11 @@ adjFlag=""
 adjFlag="_treatAdj"
 adjFlag="_treatExptNoAdj"
 
+# Model with treatment adjustment
 varInfo=data.frame(formula=c("treatment2"),variable=c("treatment2"),name=c("_treatAdj"),stringsAsFactors=F)
 adjFlag=""
 
+# Model with no adjustment
 varInfo=NULL
 adjFlag=""
 
@@ -363,7 +365,6 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
 
 compList="_slopeCat"
 subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","sham"),sep=""))
-subsetList=""
 
 for (subsetFlag in subsetList) {
     for (compFlag in compList) {

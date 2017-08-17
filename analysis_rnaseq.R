@@ -91,6 +91,7 @@ write.table(ann10, file=paste("ann_Mus_musculus.txt",sep=""),col.names=T,row.nam
 ## Section 2
 ## DE genes
 ## Set params datadir
+## If adjFlag!="_none", then checks multiple variables as covariates
 
 #library(clusterProfiler)
 library(qvalue)
@@ -102,26 +103,32 @@ plotFlag="plotAveLogCPMvsVoomWilcoxPV"
 plotFlag="scatterPlot_topGenes"
 plotFlag="dePlots"
 
-adjFlag="treatExptNoAdj"
 adjFlag="treatAndExptNoAdj"
+adjFlag="treatExptNoAdj"
+adjFlag="_none"
+adjFlag="treatAdj"
 
 fName1="_rnaSeq_p53"
 datadir="results/rnaSeq/deGene/"
-datadir="./"
 datadir="results/rnaSeq/deGene/slope/"
 datadir="results/rnaSeq/slopeCat/"
 datadir="results/rnaSeq/slope/"
 datadir="results/rnaSeq/deGene/treatment/"
 datadir="results/rnaSeq/treatAndExptNoAdj/slope/"
+datadir="./"
 datadir="results/rnaSeq/deGene/slopeCat/"
 
 colIdPV="pv"; colNamePV="PV"; pThres=10^-6
 colIdPV="qv"; colNamePV="QV"; pThres=0.05
 
-numPlotFlag="single"
+adjInfo=data.frame(id=unique(c(sub("_","",adjFlag),"exptNoAdj","investAdj","treatAdj")),stringsAsFactors=F)
+adjInfo$name=sub("Adj"," adjusted",adjInfo$id)
+
 numPlotFlag="subset"
+numPlotFlag="single"
 numPlotFlag="all"
 
+## --------------
 minCntFlag=c(10)
 compFlag3=""
 
@@ -190,8 +197,8 @@ minCntFlag=c(10)
 minCntFlag=c(1)
 compFlag3=""
 compFlag3="_voom_sva"
-compFlag3="_sva"
 compFlag3="_voom"
+compFlag3="_sva"
 
 compThis0="wilcox"
 
@@ -208,7 +215,7 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
     fName2=ifelse(length(compList0)==1,compList0,subsetList)
     if (fName2=="_") fName2=""
     fName2=paste(fName2,compFlag3,"_minCnt",minCntFlag,fName1,sep="")
-    #fName2=fName1
+    fName2=fName1
     
     if (F) {
         if (numPlotFlag=="all" & plotFlag=="dePlots") {
@@ -278,6 +285,7 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
                 if (compFlag3=="_sva") compList=paste("voom_sva_minCnt",minCntFlag,sep="")
                 if (compFlag3!="") {
                     if (numPlotFlag=="all") {
+                        adj2Flag=ifelse(adjFlag=="_none","",adjFlag)
                         if (compFlag3=="") {
                             if (plotFlag=="plotAveLogCPMvsVoomWilcoxPV") {
                                 png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=3*240,height=2*240)
@@ -292,10 +300,10 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
                                 ##par(mfcol=c(2,ceiling(length(compList)/2)))
                                 #png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=(length(compList))*2*240,height=2*240)
                                 #par(mfcol=c(1,length(compList)))
-                                png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,fName2,".png",sep=""),width=5*240,height=1*240)
+                                png(paste(plotFlag,compFlag3,compFlag1,adj2Flag,subsetFlag,fName2,".png",sep=""),width=5*240,height=1*240)
                                 par(mfrow=c(1,5))
                             } else if (plotFlag=="dePlots") {
-                                png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,fName2,".png",sep=""),width=length(compList)*240,height=2*240)
+                                png(paste(plotFlag,compFlag3,compFlag1,adj2Flag,subsetFlag,fName2,".png",sep=""),width=length(compList)*240,height=2*240)
                                 par(mfcol=c(2,length(compList)))
                                 #png(paste(plotFlag,compFlag3,compFlag1,subsetFlag,".png",sep=""),width=5*240,height=2*240)
                                 #par(mfcol=c(2,5))
@@ -304,14 +312,23 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
                     }
                 }
                 for (compThis in compList) {
+                    adj2Flag=""
+                    adjName=""
                     compFlag2=compFlag1
                     colGeneId="geneId"
                     #stat_1=read.table(paste(datadir,"stat",compFlag1,subsetFlag,fName1,"_",compThis,".txt",sep=""),sep="\t",h=T,quote="",comment.char="",as.is=T,fill=T)
-                    x=dir(datadir,pattern=paste("stat",compFlag1,sep=""))
+                    if (adjFlag=="_none") {
+                        x=dir(datadir,pattern=paste("stat",compFlag1,subsetFlag,fName1,"_",compThis,".txt",sep=""))
+                    } else {
+                        x=dir(datadir,pattern=paste("stat",compFlag1,sep=""))
+                    }
                     x=x[grep(paste(subsetFlag,fName1,"_",compThis,".txt",sep=""),x)]
                     #x=x[grep(paste(subsetFlag,fName1,compThis,".txt",sep=""),x)]
                     if (length(x)>1) {
-                        x=x[grep(paste("_",c(sub("_","",adjFlag),"exptNoAdj","investAdj","treatAdj"),subsetFlag,fName1,sep="",collapse="|"),x)]
+                        x=x[grep(paste("_",adjInfo$id,subsetFlag,fName1,sep="",collapse="|"),x)]
+                        k=!is.na(match(adjInfo$id,strsplit(x,"_")[[1]]))
+                        adj2Flag=paste("_",adjInfo$id[k])
+                        adjName=adjInfo$name[k]
                     }
                     if (length(x)==0) {
                         next
@@ -428,9 +445,9 @@ subsetList=c("",paste("_",c("cape","capeGamma","gamma","gammaTe","hze","hzeTe","
                     stat_1$qv[i]=qvalue(stat_1$pv[i])$qvalues
                     #if (compFlag3!="") compName=paste(compThis,", ",compName,sep="")
                     header=paste(subsetName,compName,sep="")
-                    header=paste(subsetName,ifelse(subsetFlag=="","","\n"),compName,sep="")
+                    header=paste(subsetName,ifelse(subsetFlag=="","","\n"),compName,ifelse(adjName=="","",paste(", ",adjName,sep="")),sep="")
                     fName3=paste(compFlag2,subsetFlag,fName2,"_",compThis,sep="")
-                    fName3=paste(compFlag2,subsetFlag,fName2,sep="")
+                    fName3=paste(compFlag2,adj2Flag,subsetFlag,fName2,sep="")
                     if (!is.null(grpUniq)) {
                         if (all(is.na(stat_1$log2FC))) {
                             stat_1$log2FC=apply(lcpmT[,which(phen10[,varList]==grpUniq[2])],1,mean,na.rm=T)-apply(lcpmT[,which(phen10[,varList]==grpUniq[1])],1,mean,na.rm=T)

@@ -377,11 +377,16 @@ adjFlag="_treatAndExptNoAdj"
 
 varInfo=data.frame(formula=c("treatExpt","group","experimentNo"),variable=c("treatExpt","group","experimentNo"),name=c("_treatExptNoAdj","_treatAdj","_exptNoAdj"),stringsAsFactors=F)
 adjFlag="_exptNoAdj"
-adjFlag=""
 adjFlag="_treatAdj"
 adjFlag="_treatExptNoAdj"
+adjFlag=""
 
+## Model with treatment adjusted
 varInfo=data.frame(formula=c("group"),variable=c("group"),name=c("_treatAdj"),stringsAsFactors=F)
+adjFlag=""
+
+## Model with no adjustment
+varInfo=NULL
 adjFlag=""
 
 grp=as.factor(eset$phen$group)
@@ -424,6 +429,8 @@ compList="slope"
 subsetList=c("",paste("_",c("gamma","hze","sham"),sep=""))
 
 compList="fastVsSlow"
+subsetList=""
+subsetList=c("",paste("_",c("gamma"),sep=""))
 subsetList=c("",paste("_",c("gamma","hze","sham"),sep=""))
 
 colId=2
@@ -472,77 +479,81 @@ for (subsetFlag in subsetList) {
         )
         phen=phen0[samId,]
         covFlag=""
-        if (varList=="slope") {
-            var2Info=varInfo
-            if (adjFlag%in%c("_treatExptNoAdj","_treatAndExptNoAdj") & sum(!duplicated(phen$group))==1) {
-                adj2Flag="_exptNoAdj"
-            } else {
-                adj2Flag=adjFlag
-            }
-            k=which(var2Info$name==adj2Flag)
-            if (length(k)==1 && k>1) var2Info=var2Info[-(1:(length(k)-1)),]
-            covFlag=""
+        if (is.null(varInfo)) {
             varList2=NULL
-            for (k in 1:nrow(var2Info)) {
-                x=table(phen[,var2Info$variable[k]])
-                x=x[which(x!=1)]
-                if (length(x)>1) {
-                    varList2=strsplit(var2Info$formula[k],"+",fixed=T)[[1]]
-                    covFlag=var2Info$name[k]
-                    break
-                }
-            }
-            if (F) {
-                varList2="group"
-                x=table(phen[,varList2])
-                x=x[which(x!=1)]
-                if (adj2Flag!="_treatAdj") x=1
-                if (length(x)>1) {
-                    covFlag="_treatAdj"
+        } else {
+            if (varList=="slope") {
+                var2Info=varInfo
+                if (adjFlag%in%c("_treatExptNoAdj","_treatAndExptNoAdj") & sum(!duplicated(phen$group))==1) {
+                    adj2Flag="_exptNoAdj"
                 } else {
-                    varList2="experimentNo"
-                    x=table(phen[,varList2])
+                    adj2Flag=adjFlag
+                }
+                k=which(var2Info$name==adj2Flag)
+                if (length(k)==1 && k>1) var2Info=var2Info[-(1:(length(k)-1)),]
+                covFlag=""
+                varList2=NULL
+                for (k in 1:nrow(var2Info)) {
+                    x=table(phen[,var2Info$variable[k]])
                     x=x[which(x!=1)]
-                    if (adj2Flag!="_exptNoAdj") x=1
                     if (length(x)>1) {
-                        covFlag="_exptNoAdj"
-                    } else {
-                        covFlag=""
-                        varList2=NULL
+                        varList2=strsplit(var2Info$formula[k],"+",fixed=T)[[1]]
+                        covFlag=var2Info$name[k]
+                        break
                     }
                 }
-            }
-            if (F) {
-                if (covFlag!="") {
-                    for (varThis in varList2) {
-                        x=table(phen[,varThis])
-                        if (any(x==1)) {
-                            cat("\nExcluded singular groups ",names(x)[x==1],"\n",sep="")
-                            x=x[which(x!=1)]
-                            samId=samId[which(phen[,varThis]%in%names(x))]
-                            phen=phen0[samId,]
+                if (F) {
+                    varList2="group"
+                    x=table(phen[,varList2])
+                    x=x[which(x!=1)]
+                    if (adj2Flag!="_treatAdj") x=1
+                    if (length(x)>1) {
+                        covFlag="_treatAdj"
+                    } else {
+                        varList2="experimentNo"
+                        x=table(phen[,varList2])
+                        x=x[which(x!=1)]
+                        if (adj2Flag!="_exptNoAdj") x=1
+                        if (length(x)>1) {
+                            covFlag="_exptNoAdj"
+                        } else {
+                            covFlag=""
+                            varList2=NULL
                         }
                     }
                 }
-            }
-        } else {
-            var2Info=varInfo
-            if (adjFlag%in%c("_treatExptNoAdj","_treatAndExptNoAdj") & sum(!duplicated(phen$group))==1) {
-                adj2Flag="_exptNoAdj"
+                if (F) {
+                    if (covFlag!="") {
+                        for (varThis in varList2) {
+                            x=table(phen[,varThis])
+                            if (any(x==1)) {
+                                cat("\nExcluded singular groups ",names(x)[x==1],"\n",sep="")
+                                x=x[which(x!=1)]
+                                samId=samId[which(phen[,varThis]%in%names(x))]
+                                phen=phen0[samId,]
+                            }
+                        }
+                    }
+                }
             } else {
-                adj2Flag=adjFlag
-            }
-            k=which(var2Info$name==adj2Flag)
-            if (length(k)==1 && k>1) var2Info=var2Info[-(1:(length(k)-1)),]
-            covFlag=""
-            varList2=NULL
-            for (k in 1:nrow(var2Info)) {
-                x=table(phen[,varList],phen[,var2Info$variable[k]])
-                y=x!=0
-                if (nrow(x)>1 && ncol(x)>1 && any(y[1,]==y[2,])) {
-                    varList2=strsplit(var2Info$formula[k],"+",fixed=T)[[1]]
-                    covFlag=var2Info$name[k]
-                    break
+                var2Info=varInfo
+                if (adjFlag%in%c("_treatExptNoAdj","_treatAndExptNoAdj") & sum(!duplicated(phen$group))==1) {
+                    adj2Flag="_exptNoAdj"
+                } else {
+                    adj2Flag=adjFlag
+                }
+                k=which(var2Info$name==adj2Flag)
+                if (length(k)==1 && k>1) var2Info=var2Info[-(1:(length(k)-1)),]
+                covFlag=""
+                varList2=NULL
+                for (k in 1:nrow(var2Info)) {
+                    x=table(phen[,varList],phen[,var2Info$variable[k]])
+                    y=x!=0
+                    if (nrow(x)>1 && ncol(x)>1 && any(y[1,]==y[2,])) {
+                        varList2=strsplit(var2Info$formula[k],"+",fixed=T)[[1]]
+                        covFlag=var2Info$name[k]
+                        break
+                    }
                 }
             }
         }
@@ -696,6 +707,21 @@ plot(density(phen0$slope,na.rm=T),main="slope")
 dev.off()
 
 ## ----------------------------------------------
+
+if (F) {
+    # fit30 & fit40 - models with no adjustment
+    # fit31 & fit41 - models with treatment adjustment
+    fit3=fit30
+    fit3$coef=cbind(fit31$coef[,1],fit30$coef)
+    fit3$p.value=cbind(fit31$p.value[,1],fit30$p.value)
+    colnames(fit3$coef)=colnames(fit3$p.value)=c("fastVsSlow_treatAdj",colnames(fit30$coef))
+    fit4=fit40
+    fit4$coef=cbind(fit41$coef[,1],fit40$coef)
+    fit4$p.value=cbind(fit41$p.value[,1],fit40$p.value)
+    colnames(fit4$coef)=colnames(fit4$p.value)=c("fastVsSlow_treatAdj",colnames(fit40$coef))
+}
+
+## ----------------------------------------------
 fName1="_moGene2.0"
 fName1="_sva_moGene2.0"
 
@@ -721,6 +747,7 @@ subsetList=c("",paste("_",c("gamma","hze","sham"),sep=""))
 
 compList1="fastVsSlow"
 subsetList=c("",paste("_",c("gamma","hze","sham"),sep=""))
+subsetList=c("_treatAdj","",paste("_",c("gamma","hze","sham"),sep=""))
 
 fName2=ifelse(length(compList1)==1,paste("_",compList1,sep=""),subsetList)
 if (fName2=="_") fName2=""
@@ -796,6 +823,11 @@ for (subsetFlag in subsetList) {
                 },
                 "fastVsSlow"={
                     compName="Fast vs. slow"
+                }
+            )
+            switch(subsetFlag,
+                "_treatAdj"={
+                    compName=paste(compName,", treat adjusted",sep="")
                 }
             )
             if (compFlag3!="") compName=paste(compThis,", ",compName,sep="")
